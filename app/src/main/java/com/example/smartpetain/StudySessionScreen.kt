@@ -21,17 +21,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun StudySessionScreen(
     onBack: () -> Unit,
+    sessionDurationMinutes: Int = 25,
     onMinuteStudied: (Int) -> Unit = {},
     onBreakTaken: () -> Unit = {}
 ) {
-    var timeLeft by remember(sessionDurationMinutes) { mutableStateOf(sessionDurationMinutes * 60) }
+    val sessionDurationSeconds = sessionDurationMinutes * 60
+    var timeLeft by remember(sessionDurationMinutes) { mutableStateOf(sessionDurationSeconds) }
     var isRunning by remember { mutableStateOf(false) }
     var sessionTime by remember { mutableStateOf(0) }
     var lastMinuteReported by remember { mutableStateOf(0) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var sessionFinished by remember { mutableStateOf(false) }
-    val progress = 1f - (timeLeft / (sessionDurationMinutes * 60f))
+    val progress = 1f - (timeLeft / sessionDurationSeconds.toFloat())
 
 // Pedir permiso notificaciones Android 13+
     val permLauncher = rememberLauncherForActivityResult(
@@ -68,10 +70,8 @@ fun StudySessionScreen(
 
     val minutes = timeLeft / 60
     val seconds = timeLeft % 60
-    val progress = 1f - (timeLeft / (25f * 60f))
-
     val character = when {
-        sessionTime >= 25 * 60 -> "🌟 ¡Cinnamoroll está muy orgulloso!"
+        sessionTime >= sessionDurationSeconds -> "🌟 ¡Cinnamoroll está muy orgulloso!"
         sessionTime >= 10 * 60 -> "💙 Cinnamoroll: ¡Sigue así, vas genial!"
         else -> "✨ Cinnamoroll: ¡Tú puedes! Concéntrate 🌱"
     }
@@ -160,9 +160,10 @@ fun StudySessionScreen(
             Button(
                 onClick = {
                     isRunning = false
-                    timeLeft = 25 * 60
+                    timeLeft = sessionDurationSeconds
                     sessionTime = 0
                     lastMinuteReported = 0
+                    sessionFinished = false
                     onBreakTaken()
                 },
                 modifier = Modifier
