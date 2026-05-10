@@ -3,6 +3,9 @@ package com.example.smartpetain
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.auth.FirebaseAuth
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 object FirebaseManager {
 
     private val db = FirebaseFirestore.getInstance()
@@ -109,24 +112,43 @@ object FirebaseManager {
                 .get()
                 .await()
 
-            snapshot.documents.mapNotNull { doc ->
-                DayStats(
-                    day = doc.getString("date")?.takeLast(5) ?: "",
-                    minutes = (doc.getLong("minutes") ?: 0).toInt()
-                )
+            val minutesByDate = snapshot.documents.associate { doc ->
+                val date = doc.getString("date") ?: doc.id
+                val minutes = (doc.getLong("minutes") ?: 0).toInt()
+                date to minutes
+            }
+
+            getCurrentWeekDates().map { (label, date) ->
+                DayStats(day = label, minutes = minutesByDate[date] ?: 0)
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            emptyList()
+            getCurrentWeekDates().map { (label, _) ->
+                DayStats(day = label, minutes = 0)
+            }
+        }
+    }
+
+    private fun getCurrentWeekDates(): List<Pair<String, String>> {
+        val labels = listOf("Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom")
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val cal = Calendar.getInstance()
+        cal.firstDayOfWeek = Calendar.MONDAY
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+
+        return labels.map { label ->
+            val date = formatter.format(cal.time)
+            cal.add(Calendar.DAY_OF_MONTH, 1)
+            label to date
         }
     }
 
     private fun getCurrentDate(): String {
-        val cal = java.util.Calendar.getInstance()
+        val cal = Calendar.getInstance()
         return "%04d-%02d-%02d".format(
-            cal.get(java.util.Calendar.YEAR),
-            cal.get(java.util.Calendar.MONTH) + 1,
-            cal.get(java.util.Calendar.DAY_OF_MONTH)
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH)
         )
     }
     suspend fun saveProfile(name: String, pomodoroDuration: Int) {
