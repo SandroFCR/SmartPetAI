@@ -6,7 +6,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,8 +24,25 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,35 +51,54 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.example.smartpetain.ui.theme.*
+import com.example.smartpetain.ui.theme.Background
+import com.example.smartpetain.ui.theme.PurpleLight
+import com.example.smartpetain.ui.theme.PurplePrimary
+import com.example.smartpetain.ui.theme.TextPrimary
+import com.example.smartpetain.ui.theme.TextSecondary
+import com.example.smartpetain.ui.theme.White
 import kotlinx.coroutines.launch
+
 @Composable
 fun ProfileScreen(
     totalStudyMinutes: Int = 0,
-    completedTasks: Int = 0,
-    onPomodoroChanged: (Int) -> Unit = {}
-
+    completedTasks: Int = 0
 ) {
-    var name by remember { mutableStateOf("Cargando...") }
+    var profile by remember { mutableStateOf(UserProfile(name = "Cargando...")) }
     var editingName by remember { mutableStateOf(false) }
     var tempName by remember { mutableStateOf("") }
-    var avatarUri by remember { mutableStateOf<Uri?>(null) }
-    var pomodoroDuration by remember { mutableStateOf(25) }
+    var localAvatarUri by remember { mutableStateOf<Uri?>(null) }
     var darkMode by remember { mutableStateOf(false) }
+    var isUploadingAvatar by remember { mutableStateOf(false) }
+    var avatarMessage by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
 
-// Cargar perfil al iniciar
     LaunchedEffect(Unit) {
-        val (loadedName, loadedPomodoro) = FirebaseManager.loadProfile()
-        name = loadedName
-        tempName = loadedName
-        pomodoroDuration = loadedPomodoro
+        profile = FirebaseManager.loadProfile()
+        tempName = profile.name
     }
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri -> if (uri != null) avatarUri = uri }
+    ) { uri ->
+        if (uri != null) {
+            localAvatarUri = uri
+            avatarMessage = null
+            isUploadingAvatar = true
+            scope.launch {
+                val avatarUrl = FirebaseManager.uploadProfileImage(uri)
+                if (avatarUrl != null) {
+                    profile = profile.copy(avatarUrl = avatarUrl)
+                    FirebaseManager.saveProfile(profile)
+                    localAvatarUri = null
+                } else {
+                    avatarMessage = "No se pudo guardar la foto en Firebase Storage."
+                }
+                isUploadingAvatar = false
+            }
+        }
+    }
 
     val hours = totalStudyMinutes / 60
     val minutes = totalStudyMinutes % 60
@@ -77,27 +123,25 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ── Avatar ──
         Box(contentAlignment = Alignment.BottomEnd) {
-            if (avatarUri != null) {
+            val avatarModifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .border(2.dp, PurplePrimary, CircleShape)
+                .clickable(enabled = !isUploadingAvatar) { imagePicker.launch("image/*") }
+
+            val avatarModel = localAvatarUri ?: profile.avatarUrl
+
+            if (avatarModel != null) {
                 AsyncImage(
-                    model = avatarUri,
+                    model = avatarModel,
                     contentDescription = "Foto de perfil",
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(CircleShape)
-                        .border(2.dp, PurplePrimary, CircleShape)
-                        .clickable { imagePicker.launch("image/*") },
+                    modifier = avatarModifier,
                     contentScale = ContentScale.Crop
                 )
             } else {
                 Box(
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(CircleShape)
-                        .background(PurpleLight)
-                        .border(2.dp, PurplePrimary, CircleShape)
-                        .clickable { imagePicker.launch("image/*") },
+                    modifier = avatarModifier.background(PurpleLight),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -108,6 +152,7 @@ fun ProfileScreen(
                     )
                 }
             }
+
             Box(
                 modifier = Modifier
                     .size(28.dp)
@@ -115,18 +160,34 @@ fun ProfileScreen(
                     .background(PurplePrimary),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Cambiar foto",
-                    modifier = Modifier.size(16.dp),
-                    tint = White
-                )
+                if (isUploadingAvatar) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Cambiar foto",
+                        modifier = Modifier.size(16.dp),
+                        tint = White
+                    )
+                }
             }
+        }
+
+        if (avatarMessage != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = avatarMessage.orEmpty(),
+                fontSize = 12.sp,
+                color = TextSecondary
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ── Nombre ──
         if (editingName) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -141,26 +202,19 @@ fun ProfileScreen(
                 )
                 Button(
                     onClick = {
-                        name = tempName.trim().ifEmpty { "Valeria" }
-                        editingName = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("✓")
-                }
-                Button(
-                    onClick = {
-                        name = tempName.trim().ifEmpty { "Estudiante" }
+                        val updatedProfile = profile.copy(
+                            name = tempName.trim().ifEmpty { "Estudiante" }
+                        )
+                        profile = updatedProfile
                         editingName = false
                         scope.launch {
-                            FirebaseManager.saveProfile(name, pomodoroDuration)
+                            FirebaseManager.saveProfile(updatedProfile)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("✓")
+                    Text("OK")
                 }
             }
         } else {
@@ -169,41 +223,27 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = name,
+                    text = profile.name,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
                 IconButton(onClick = {
-                    tempName = name
+                    tempName = profile.name
                     editingName = true
                 }) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar nombre",
-                        tint = TextSecondary, modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = {
-                    if (pomodoroDuration > 5) {
-                        pomodoroDuration -= 5
-                        scope.launch { FirebaseManager.saveProfile(name, pomodoroDuration) }
-                    }
-                }) {
-                    Text("−", fontSize = 20.sp, color = PurplePrimary, fontWeight = FontWeight.Bold)
-                }
-
-                IconButton(onClick = {
-                    if (pomodoroDuration < 60) {
-                        pomodoroDuration += 5
-                        scope.launch { FirebaseManager.saveProfile(name, pomodoroDuration) }
-                    }
-                }) {
-                    Text("+", fontSize = 20.sp, color = PurplePrimary, fontWeight = FontWeight.Bold)
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Editar nombre",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ── Stats rápidas ──
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -225,7 +265,7 @@ fun ProfileScreen(
                     )
                     Text("Tiempo estudiado", fontSize = 11.sp, color = TextSecondary)
                 }
-                Divider(
+                HorizontalDivider(
                     modifier = Modifier
                         .height(40.dp)
                         .width(1.dp),
@@ -245,7 +285,6 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ── Configuración ──
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -254,7 +293,7 @@ fun ProfileScreen(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "Configuración",
+                    text = "Configuracion",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
@@ -262,48 +301,33 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Duración Pomodoro
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Duración Pomodoro", fontSize = 15.sp, color = TextPrimary)
-                        Text("$pomodoroDuration minutos", fontSize = 12.sp, color = TextSecondary)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = {
-                            if (pomodoroDuration > 5) pomodoroDuration -= 5
-                        }) {
-                            Text("−", fontSize = 20.sp, color = PurplePrimary,
-                                fontWeight = FontWeight.Bold)
-                        }
+                        Text("Pomodoro", fontSize = 15.sp, color = TextPrimary)
                         Text(
-                            text = "$pomodoroDuration",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+                            "Se configura al iniciar una sesion",
+                            fontSize = 12.sp,
+                            color = TextSecondary
                         )
-                        IconButton(onClick = {
-                            if (pomodoroDuration < 60) pomodoroDuration += 5
-                        }) {
-                            Text("+", fontSize = 20.sp, color = PurplePrimary,
-                                fontWeight = FontWeight.Bold)
-                        }
                     }
-                    pomodoroDuration -= 5
-                    onPomodoroChanged(pomodoroDuration)
-
-                    pomodoroDuration += 5
-                    onPomodoroChanged(pomodoroDuration)
-
+                    Text(
+                        "${profile.pomodoroDuration} min",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PurplePrimary
+                    )
                 }
 
-                Divider(color = PurpleLight, thickness = 0.5.dp,
-                    modifier = Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(
+                    color = PurpleLight,
+                    thickness = 0.5.dp,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
 
-                // Dark mode
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -321,7 +345,6 @@ fun ProfileScreen(
                 }
             }
         }
-
 
         Spacer(modifier = Modifier.height(32.dp))
     }

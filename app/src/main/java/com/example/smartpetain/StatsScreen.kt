@@ -41,7 +41,8 @@ import java.util.Calendar
 
 data class DayStats(
     val day: String,
-    val minutes: Int
+    val minutes: Int,
+    val completedSessions: Int = 0
 )
 
 @Composable
@@ -50,9 +51,11 @@ fun StatsScreen(
     totalStudyMinutes: Int = 0
 ) {
     var weekStats by remember { mutableStateOf(emptyWeekStats()) }
+    var dailyGoalMinutes by remember { mutableStateOf(25) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
+        dailyGoalMinutes = FirebaseManager.loadProfile().pomodoroDuration
         weekStats = FirebaseManager.loadWeekStats()
         isLoading = false
     }
@@ -62,8 +65,20 @@ fun StatsScreen(
     val totalHours = totalWeek / 60
     val totalMins = totalWeek % 60
     val avgMinutes = totalWeek / 7
-    val completedSessions = weekStats.count { it.minutes >= 25 }
-    val productivity = ((totalWeek / (7f * 25f)) * 100).toInt().coerceIn(0, 100)
+    val completedSessions = weekStats.sumOf { day ->
+        day.completedSessions.takeIf { it > 0 }
+            ?: if (day.minutes >= dailyGoalMinutes) 1 else 0
+    }
+    val weeklyGoalMinutes = (dailyGoalMinutes * 7).coerceAtLeast(1)
+    val effectiveMinutes = weekStats.sumOf { it.minutes.coerceAtMost(dailyGoalMinutes) }
+    val productivity = ((effectiveMinutes / weeklyGoalMinutes.toFloat()) * 100).toInt().coerceIn(0, 100)
+    val currentStreak = calculateCurrentStreak(weekStats, dailyGoalMinutes)
+    val bestDay = weekStats.maxByOrNull { it.minutes }
+    val bestDayText = if (bestDay != null && bestDay.minutes > 0) {
+        "${bestDay.day}: ${bestDay.minutes}min"
+    } else {
+        "Sin datos"
+    }
     val productivityLabel = when {
         productivity >= 80 -> "Excelente"
         productivity >= 50 -> "Buen avance"
@@ -152,13 +167,13 @@ fun StatsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp),
+                            .height(138.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.Bottom
                     ) {
                         weekStats.forEach { day ->
                             val barHeight = if (day.minutes > 0) {
-                                (day.minutes.toFloat() / maxMinutes * 100).dp
+                                (day.minutes.toFloat() / maxMinutes * 78).dp
                             } else {
                                 4.dp
                             }
@@ -167,25 +182,34 @@ fun StatsScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Bottom,
-                                modifier = Modifier.height(120.dp)
+                                modifier = Modifier.height(138.dp)
                             ) {
-                                if (day.minutes > 0) {
-                                    Text(
-                                        text = "${day.minutes}",
-                                        fontSize = 9.sp,
-                                        color = TextSecondary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
                                 Box(
                                     modifier = Modifier
-                                        .width(28.dp)
-                                        .height(barHeight)
-                                        .background(
-                                            color = if (isToday) PurplePrimary else PurpleLight,
-                                            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                        .height(104.dp)
+                                        .width(32.dp),
+                                    contentAlignment = Alignment.BottomCenter
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        if (day.minutes > 0) {
+                                            Text(
+                                                text = "${day.minutes}",
+                                                fontSize = 9.sp,
+                                                color = TextSecondary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .width(28.dp)
+                                                .height(barHeight)
+                                                .background(
+                                                    color = if (isToday) PurplePrimary else PurpleLight,
+                                                    shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                                )
                                         )
-                                )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = day.day,
@@ -202,6 +226,37 @@ fun StatsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = White),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Meta semanal",
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+                Text(
+                    text = "${effectiveMinutes.coerceAtMost(weeklyGoalMinutes)} / $weeklyGoalMinutes min",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Text(
+                    text = "Objetivo diario: $dailyGoalMinutes min",
+                    fontSize = 12.sp,
+                    color = PurplePrimary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -209,8 +264,8 @@ fun StatsScreen(
             MetricCard(
                 icon = "O",
                 value = "$completedSessions",
-                title = "Sesiones completadas",
-                subtitle = if (completedSessions > 0) "25 min o mas" else "Sin sesiones",
+                title = "Sesiones completas",
+                subtitle = if (completedSessions > 0) "$dailyGoalMinutes min o mas" else "Sin sesiones",
                 modifier = Modifier.weight(1f)
             )
 
@@ -219,6 +274,29 @@ fun StatsScreen(
                 value = "$productivity%",
                 title = "Productividad",
                 subtitle = productivityLabel,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MetricCard(
+                icon = "#",
+                value = "$currentStreak",
+                title = "Racha actual",
+                subtitle = if (currentStreak == 1) "dia cumplido" else "dias cumplidos",
+                modifier = Modifier.weight(1f)
+            )
+
+            MetricCard(
+                icon = "^",
+                value = bestDay?.minutes?.takeIf { it > 0 }?.let { "${it}m" } ?: "0m",
+                title = "Mejor dia",
+                subtitle = bestDayText,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -240,7 +318,7 @@ fun StatsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = weeklyStudyMessage(totalWeek, avgMinutes),
+                    text = weeklyStudyMessage(totalWeek, avgMinutes, dailyGoalMinutes),
                     fontSize = 14.sp,
                     color = TextPrimary
                 )
@@ -268,7 +346,7 @@ private fun MetricCard(
 ) {
     Card(
         modifier = modifier
-            .height(104.dp)
+            .height(124.dp)
             .padding(0.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = White),
@@ -283,10 +361,10 @@ private fun MetricCard(
                 color = TextPrimary,
                 modifier = Modifier.padding(top = 4.dp)
             )
-            Text(text = title, fontSize = 11.sp, color = TextSecondary)
+            Text(text = title, fontSize = 10.sp, color = TextSecondary)
             Text(
                 text = subtitle,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 color = TealPrimary,
                 fontWeight = FontWeight.Bold
             )
@@ -318,10 +396,22 @@ private fun currentDayLabel(): String {
     }
 }
 
-private fun weeklyStudyMessage(totalWeek: Int, avgMinutes: Int): String {
+private fun calculateCurrentStreak(weekStats: List<DayStats>, dailyGoalMinutes: Int): Int {
+    var streak = 0
+    for (day in weekStats.asReversed()) {
+        if (day.minutes >= dailyGoalMinutes) {
+            streak++
+        } else if (day.minutes > 0 || streak > 0) {
+            break
+        }
+    }
+    return streak
+}
+
+private fun weeklyStudyMessage(totalWeek: Int, avgMinutes: Int, dailyGoalMinutes: Int): String {
     return when {
         totalWeek == 0 -> "Completa una sesion Pomodoro para empezar a ver tus estadisticas reales."
-        avgMinutes >= 25 -> "Buen ritmo: esta semana estas sosteniendo al menos un Pomodoro diario en promedio."
-        else -> "Ya empezaste. Intenta completar una sesion de 25 minutos para mejorar tu promedio semanal."
+        avgMinutes >= dailyGoalMinutes -> "Buen ritmo: esta semana estas sosteniendo tu meta diaria de $dailyGoalMinutes minutos en promedio."
+        else -> "Ya empezaste. Intenta completar una sesion de $dailyGoalMinutes minutos para mejorar tu productividad semanal."
     }
 }
