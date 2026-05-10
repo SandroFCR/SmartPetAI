@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "384391079714",
+    "project_id": "smartpetai",
+    "storage_bucket": "smartpetai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384391079714:android:689b4359d9e897c177677b",
+        "android_client_info": {
+          "package_name": "com.example.smartpetain"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXrZXtI5uO8Gz5koC0ZnmPatgtLAw7cLg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
