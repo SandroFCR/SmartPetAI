@@ -50,6 +50,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 // Auth (para usuario)
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-storage")
     // Compose BOM (maneja todas las versiones automáticamente)
     val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
     implementation(composeBom)
@@ -83,5 +84,4 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
-
 

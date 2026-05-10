@@ -62,8 +62,9 @@ fun AppNavigator() {
     var pomodoroDuration  by remember { mutableStateOf(25) }
 
     LaunchedEffect(Unit) {
-        val (_, pomodoro) = FirebaseManager.loadProfile()
-        pomodoroDuration = pomodoro
+        val profile = FirebaseManager.loadProfile()
+        pomodoroDuration = profile.pomodoroDuration
+        totalStudyMinutes = FirebaseManager.loadTotalStudyMinutes()
     }
 
     val activeCharacter = CharacterEngine.getCharacter(
@@ -85,19 +86,29 @@ fun AppNavigator() {
         StudySessionScreen(
             onBack                 = { currentScreen = "dashboard" },
             sessionDurationMinutes = pomodoroDuration,
+            onPomodoroChanged      = { duration ->
+                pomodoroDuration = duration
+                scope.launch {
+                    FirebaseManager.savePomodoroDuration(duration)
+                }
+            },
             onMinuteStudied        = { minutes ->
                 totalStudyMinutes += minutes
                 minutesSinceBreak += minutes
+                scope.launch {
+                    FirebaseManager.saveDailyStats(minutes)
+                }
+            },
+            onSessionFinished      = { minutes ->
+                scope.launch {
+                    FirebaseManager.saveStudySession(
+                        minutes = minutes,
+                        character = activeCharacter.name,
+                        updateDailyStats = false
+                    )
+                }
             },
             onBreakTaken = {
-                if (minutesSinceBreak >= 1) {
-                    scope.launch {
-                        FirebaseManager.saveStudySession(
-                            minutes   = minutesSinceBreak,
-                            character = activeCharacter.name
-                        )
-                    }
-                }
                 minutesSinceBreak = 0
             }
         )
@@ -158,8 +169,7 @@ fun AppNavigator() {
                 )
                 "profile" -> ProfileScreen(
                     totalStudyMinutes = totalStudyMinutes,
-                    completedTasks    = completedTasks,
-                    onPomodoroChanged = { pomodoroDuration = it }
+                    completedTasks    = completedTasks
                 )
             }
         }
