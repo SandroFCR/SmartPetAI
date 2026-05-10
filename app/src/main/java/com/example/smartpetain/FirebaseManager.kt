@@ -16,6 +16,13 @@ data class UserProfile(
     val avatarUrl: String? = null
 )
 
+data class StudySessionRecord(
+    val minutes: Int,
+    val character: String,
+    val date: String,
+    val timestamp: Long
+)
+
 object FirebaseManager {
 
     private val db = FirebaseFirestore.getInstance()
@@ -195,6 +202,30 @@ object FirebaseManager {
         } catch (e: Exception) {
             e.printStackTrace()
             0
+        }
+    }
+
+    suspend fun loadRecentStudySessions(limit: Long = 5): List<StudySessionRecord> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(userId)
+                .collection("sessions")
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(limit)
+                .get()
+                .await()
+
+            snapshot.documents.map { doc ->
+                StudySessionRecord(
+                    minutes = (doc.getLong("minutes") ?: 0).toInt(),
+                    character = doc.getString("character") ?: "Cinnamoroll",
+                    date = doc.getString("date") ?: "",
+                    timestamp = doc.getLong("timestamp") ?: 0L
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
         }
     }
 
