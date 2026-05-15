@@ -168,7 +168,8 @@ fun AppNavigator() {
                 )
                 "characters" -> CharactersScreen(
                     totalStudyMinutes = totalStudyMinutes,
-                    completedTasks    = completedTasks
+                    completedTasks    = completedTasks,
+                    pendingTasks      = pendingTasks
                 )
                 "profile" -> ProfileScreen(
                     totalStudyMinutes = totalStudyMinutes,
