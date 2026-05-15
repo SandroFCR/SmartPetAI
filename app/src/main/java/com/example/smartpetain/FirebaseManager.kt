@@ -80,6 +80,19 @@ object FirebaseManager {
         }
     }
 
+    suspend fun deleteTask(taskId: Int) {
+        try {
+            db.collection("users")
+                .document(userId)
+                .collection("tasks")
+                .document(taskId.toString())
+                .delete()
+                .await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     suspend fun loadTasks(): List<Task> {
         return try {
             val snapshot = db.collection("users")
@@ -89,7 +102,7 @@ object FirebaseManager {
                 .await()
 
             snapshot.documents.mapNotNull { doc ->
-                Task(
+                val task = Task(
                     id = (doc.getLong("id") ?: 0).toInt(),
                     title = doc.getString("title") ?: "",
                     subject = doc.getString("subject") ?: "",
@@ -97,11 +110,24 @@ object FirebaseManager {
                     dueDate = doc.getString("dueDate") ?: "",
                     isCompleted = doc.getBoolean("isCompleted") ?: false
                 )
+                if (isSampleTask(task)) {
+                    doc.reference.delete().await()
+                    null
+                } else {
+                    task
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
         }
+    }
+
+    private fun isSampleTask(task: Task): Boolean {
+        return task.title == "Resolver ejercicios de integrales" ||
+            task.title.startsWith("Leer cap") ||
+            task.title == "Proyecto en Flutter" ||
+            task.title == "Practicar tiempos verbales"
     }
 
     suspend fun saveDailyStats(minutes: Int) {

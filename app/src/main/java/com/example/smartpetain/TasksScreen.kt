@@ -1,19 +1,59 @@
 package com.example.smartpetain
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.smartpetain.ui.theme.*
+import com.example.smartpetain.ui.theme.AmberLight
+import com.example.smartpetain.ui.theme.AmberPrimary
+import com.example.smartpetain.ui.theme.Background
+import com.example.smartpetain.ui.theme.PinkLight
+import com.example.smartpetain.ui.theme.PinkPrimary
+import com.example.smartpetain.ui.theme.PurpleLight
+import com.example.smartpetain.ui.theme.PurplePrimary
+import com.example.smartpetain.ui.theme.TealLight
+import com.example.smartpetain.ui.theme.TealPrimary
+import com.example.smartpetain.ui.theme.TextPrimary
+import com.example.smartpetain.ui.theme.TextSecondary
+import com.example.smartpetain.ui.theme.White
 import java.util.Calendar
 import kotlinx.coroutines.launch
 
@@ -34,31 +74,24 @@ fun TasksScreen(
 ) {
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
-
-    var tasks by remember {
-        mutableStateOf(
-            listOf(
-                Task(1, "Resolver ejercicios de integrales", "Matemáticas", "Alta", "2026-05-10"),
-                Task(2, "Leer capítulo 4: Revolución Industrial", "Historia", "Media", "2026-05-12"),
-                Task(3, "Proyecto en Flutter", "Programación", "Alta", "2026-05-15"),
-                Task(4, "Practicar tiempos verbales", "Inglés", "Baja", "2026-05-20")
-            )
-        )
-    }
-
-    // Cargar tareas desde Firebase al inicio
-    LaunchedEffect(Unit) {
-        val firebaseTasks = FirebaseManager.loadTasks()
-        if (firebaseTasks.isNotEmpty()) {
-            tasks = firebaseTasks
-        }
-        isLoading = false
-    }
-
+    var tasks by remember { mutableStateOf(emptyList<Task>()) }
     var showDialog by remember { mutableStateOf(false) }
     var sortBy by remember { mutableStateOf("none") }
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskSubject by remember { mutableStateOf("") }
+
+    fun notifyTaskCounts(currentTasks: List<Task>) {
+        onTasksChanged(
+            currentTasks.count { !it.isCompleted },
+            currentTasks.count { it.isCompleted }
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        tasks = FirebaseManager.loadTasks()
+        notifyTaskCounts(tasks)
+        isLoading = false
+    }
 
     val completedCount = tasks.count { it.isCompleted }
     val pendingCount = tasks.count { !it.isCompleted }
@@ -72,7 +105,9 @@ fun TasksScreen(
 
     if (isLoading) {
         Box(
-            modifier = Modifier.fillMaxSize().background(Background),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Background),
             contentAlignment = Alignment.Center
         ) {
             CircularProgressIndicator(color = PurplePrimary)
@@ -93,7 +128,7 @@ fun TasksScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onBack) {
-                Text("← Volver", color = PurplePrimary, fontSize = 16.sp)
+                Text("<- Volver", color = PurplePrimary, fontSize = 16.sp)
             }
         }
 
@@ -109,7 +144,7 @@ fun TasksScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = RoundedCornerShape(20.dp), color = PurpleLight) {
                 Text(
-                    text = "📋 $pendingCount pendientes",
+                    text = "$pendingCount pendientes",
                     fontSize = 13.sp,
                     color = PurplePrimary,
                     fontWeight = FontWeight.Bold,
@@ -118,7 +153,7 @@ fun TasksScreen(
             }
             Surface(shape = RoundedCornerShape(20.dp), color = TealLight) {
                 Text(
-                    text = "✅ $completedCount completadas",
+                    text = "$completedCount completadas",
                     fontSize = 13.sp,
                     color = TealPrimary,
                     fontWeight = FontWeight.Bold,
@@ -131,9 +166,9 @@ fun TasksScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(
-                "none" to "📋 Normal",
-                "priority" to "🔥 Prioridad",
-                "date" to "📅 Fecha"
+                "none" to "Normal",
+                "priority" to "Prioridad",
+                "date" to "Fecha"
             ).forEach { (key, label) ->
                 val isSelected = sortBy == key
                 Surface(
@@ -154,35 +189,48 @@ fun TasksScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(sortedTasks) { task ->
-                TaskItem(
-                    task = task,
-                    onToggle = { toggledTask ->
-                        tasks = tasks.map {
-                            if (it.id == toggledTask.id)
-                                it.copy(isCompleted = !it.isCompleted)
-                            else it
-                        }
-                        // Guardar en Firebase
-                        val updatedTask = tasks.first { it.id == toggledTask.id }
-                        scope.launch { FirebaseManager.saveTask(updatedTask) }
-                        onTasksChanged(
-                            tasks.count { !it.isCompleted },
-                            tasks.count { it.isCompleted }
-                        )
-                    },
-                    onDelete = { deletedTask ->
-                        tasks = tasks.filter { it.id != deletedTask.id }
-                        onTasksChanged(
-                            tasks.count { !it.isCompleted },
-                            tasks.count { it.isCompleted }
-                        )
-                    }
+        if (tasks.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Aun no tienes tareas.",
+                    fontSize = 14.sp,
+                    color = TextSecondary
                 )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(sortedTasks, key = { it.id }) { task ->
+                    TaskItem(
+                        task = task,
+                        onToggle = { toggledTask ->
+                            val updatedTasks = tasks.map {
+                                if (it.id == toggledTask.id) {
+                                    it.copy(isCompleted = !it.isCompleted)
+                                } else {
+                                    it
+                                }
+                            }
+                            tasks = updatedTasks
+                            val updatedTask = updatedTasks.first { it.id == toggledTask.id }
+                            scope.launch { FirebaseManager.saveTask(updatedTask) }
+                            notifyTaskCounts(updatedTasks)
+                        },
+                        onDelete = { deletedTask ->
+                            val updatedTasks = tasks.filter { it.id != deletedTask.id }
+                            tasks = updatedTasks
+                            scope.launch { FirebaseManager.deleteTask(deletedTask.id) }
+                            notifyTaskCounts(updatedTasks)
+                        }
+                    )
+                }
             }
         }
 
@@ -190,7 +238,9 @@ fun TasksScreen(
 
         Button(
             onClick = { showDialog = true },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
         ) {
@@ -242,7 +292,7 @@ fun TasksScreen(
                         readOnly = true,
                         trailingIcon = {
                             TextButton(onClick = { showDatePicker = true }) {
-                                Text("📅", fontSize = 18.sp)
+                                Text("Elegir", fontSize = 12.sp)
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -283,15 +333,16 @@ fun TasksScreen(
                     onClick = {
                         if (newTaskTitle.isNotBlank()) {
                             val newTask = Task(
-                                id = tasks.size + 1,
-                                title = newTaskTitle,
-                                subject = newTaskSubject.ifBlank { "General" },
+                                id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
+                                title = newTaskTitle.trim(),
+                                subject = newTaskSubject.trim().ifBlank { "General" },
                                 priority = selectedPriority,
                                 dueDate = selectedDateText
                             )
-                            tasks = tasks + newTask
-                            // Guardar en Firebase
+                            val updatedTasks = tasks + newTask
+                            tasks = updatedTasks
                             scope.launch { FirebaseManager.saveTask(newTask) }
+                            notifyTaskCounts(updatedTasks)
                             newTaskTitle = ""
                             newTaskSubject = ""
                             showDialog = false
@@ -316,7 +367,9 @@ fun TasksScreen(
                     Button(
                         onClick = { showDatePicker = false },
                         colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
-                    ) { Text("Confirmar") }
+                    ) {
+                        Text("Confirmar")
+                    }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDatePicker = false }) {
@@ -352,7 +405,9 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
@@ -360,7 +415,11 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                 onCheckedChange = { onToggle(task) },
                 colors = CheckboxDefaults.colors(checkedColor = PurplePrimary)
             )
-            Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp)
+            ) {
                 Text(
                     text = task.title,
                     fontSize = 15.sp,
@@ -383,7 +442,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                 }
                 if (task.dueDate.isNotBlank()) {
                     Text(
-                        text = "📅 ${task.dueDate}",
+                        text = task.dueDate,
                         fontSize = 11.sp,
                         color = TextSecondary,
                         modifier = Modifier.padding(top = 2.dp)
@@ -391,7 +450,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                 }
             }
             TextButton(onClick = { onDelete(task) }) {
-                Text("✕", color = TextSecondary, fontSize = 16.sp)
+                Text("X", color = TextSecondary, fontSize = 16.sp)
             }
         }
     }

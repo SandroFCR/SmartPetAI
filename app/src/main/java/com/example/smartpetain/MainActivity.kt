@@ -57,14 +57,17 @@ fun AppNavigator() {
     var currentScreen     by remember { mutableStateOf("dashboard") }
     var totalStudyMinutes by remember { mutableStateOf(0) }
     var minutesSinceBreak by remember { mutableStateOf(0) }
-    var pendingTasks      by remember { mutableStateOf(4) }
+    var pendingTasks      by remember { mutableStateOf(0) }
     var completedTasks    by remember { mutableStateOf(0) }
     var pomodoroDuration  by remember { mutableStateOf(25) }
 
     LaunchedEffect(Unit) {
         val profile = FirebaseManager.loadProfile()
+        val tasks = FirebaseManager.loadTasks()
         pomodoroDuration = profile.pomodoroDuration
         totalStudyMinutes = FirebaseManager.loadTotalStudyMinutes()
+        pendingTasks = tasks.count { !it.isCompleted }
+        completedTasks = tasks.count { it.isCompleted }
     }
 
     val activeCharacter = CharacterEngine.getCharacter(
