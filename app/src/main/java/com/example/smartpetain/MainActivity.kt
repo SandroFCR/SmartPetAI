@@ -78,7 +78,7 @@ fun AppNavigator() {
     )
 
     val navItems = listOf(
-        NavItem("Inicio",       Icons.Filled.Home,     "dashboard"),
+        NavItem("Portada",       Icons.Filled.Home,     "dashboard"),
         NavItem("Tareas",       Icons.Filled.List,     "tasks"),
         NavItem("Estadísticas", Icons.Filled.Star,     "stats"),
         NavItem("Mascotas",     Icons.Filled.Favorite, "characters"),
