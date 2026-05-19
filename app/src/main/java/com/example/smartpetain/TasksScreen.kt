@@ -1,6 +1,7 @@
 package com.example.smartpetain
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,10 +10,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -24,6 +34,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +50,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -62,6 +77,7 @@ data class Task(
     val title: String,
     val subject: String,
     val priority: String,
+    val emoji: String = "",
     val dueDate: String = "",
     var isCompleted: Boolean = false
 )
@@ -77,8 +93,10 @@ fun TasksScreen(
     var tasks by remember { mutableStateOf(emptyList<Task>()) }
     var showDialog by remember { mutableStateOf(false) }
     var sortBy by remember { mutableStateOf("none") }
+    var selectedTab by remember { mutableStateOf("pending") }
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskSubject by remember { mutableStateOf("") }
+    var newTaskEmoji by remember { mutableStateOf("") }
 
     fun notifyTaskCounts(currentTasks: List<Task>) {
         onTasksChanged(
@@ -97,20 +115,23 @@ fun TasksScreen(
     val pendingCount = tasks.count { !it.isCompleted }
 
     val priorityOrder = mapOf("Alta" to 0, "Media" to 1, "Baja" to 2)
+    val visibleTasks = tasks.filter {
+        if (selectedTab == "pending") !it.isCompleted else it.isCompleted
+    }
     val sortedTasks = when (sortBy) {
-        "priority" -> tasks.sortedBy { priorityOrder[it.priority] ?: 3 }
-        "date" -> tasks.sortedBy { it.dueDate }
-        else -> tasks
+        "priority" -> visibleTasks.sortedBy { priorityOrder[it.priority] ?: 3 }
+        "date" -> visibleTasks.sortedBy { it.dueDate.ifBlank { "9999-99-99" } }
+        else -> visibleTasks
     }
 
     if (isLoading) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Background),
+                .background(TaskWarmBackground),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = PurplePrimary)
+            CircularProgressIndicator(color = TaskGold)
         }
         return
     }
@@ -118,53 +139,133 @@ fun TasksScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(TaskWarmBackground)
             .padding(20.dp)
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onBack) {
-                Text("<- Volver", color = PurplePrimary, fontSize = 16.sp)
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = TextPrimary
+                )
             }
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Filled.MoreHoriz,
+                contentDescription = null,
+                tint = TextPrimary
+            )
         }
 
         Text(
-            text = "Mis tareas",
-            fontSize = 26.sp,
+            text = "    Mis tareas  ",
+            fontSize = 46.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = TaskBrown,
+            modifier = Modifier.padding(start = 8.dp)
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(shape = RoundedCornerShape(20.dp), color = PurpleLight) {
-                Text(
-                    text = "$pendingCount pendientes",
-                    fontSize = 13.sp,
-                    color = PurplePrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(170.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.StarBorder,
+                contentDescription = null,
+                tint = TaskGold.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(y = 10.dp)
+            )
+            Image(
+                painter = painterResource(id = R.drawable.penguin_tasks),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(width = 178.dp, height = 166.dp)
+                    .align(Alignment.BottomStart)
+                    .offset(x = (-16).dp, y = 8.dp)
+            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 142.dp, top = 34.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "Organicemos tu dia!✨",
+                        fontSize = 16.sp,
+                        color = TaskBrown,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Tu puedes con todo.",
+                        fontSize = 15.sp,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
             }
-            Surface(shape = RoundedCornerShape(20.dp), color = TealLight) {
-                Text(
-                    text = "$completedCount completadas",
-                    fontSize = 13.sp,
-                    color = TealPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            Icon(
+                imageVector = Icons.Filled.StarBorder,
+                contentDescription = null,
+                tint = TaskGold.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(y = 8.dp)
+                    .size(18.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TaskTabChip(
+                    text = "Pendientes",
+                    count = pendingCount,
+                    selected = selectedTab == "pending",
+                    modifier = Modifier.weight(1f),
+                    onClick = { selectedTab = "pending" }
+                )
+                TaskTabChip(
+                    text = "Completadas",
+                    count = completedCount,
+                    selected = selectedTab == "completed",
+                    modifier = Modifier.weight(1f),
+                    onClick = { selectedTab = "completed" }
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
             listOf(
                 "none" to "Normal",
                 "priority" to "Prioridad",
@@ -174,22 +275,23 @@ fun TasksScreen(
                 Surface(
                     onClick = { sortBy = key },
                     shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) PurplePrimary else PurpleLight
+                    color = if (isSelected) TaskGold else White
                 ) {
                     Text(
                         text = label,
                         fontSize = 12.sp,
-                        color = if (isSelected) White else PurplePrimary,
+                        color = if (isSelected) White else TaskGold,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (tasks.isEmpty()) {
+        if (sortedTasks.isEmpty()) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -197,7 +299,11 @@ fun TasksScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aun no tienes tareas.",
+                    text = if (selectedTab == "pending") {
+                        "Aun no tienes tareas pendientes."
+                    } else {
+                        "Aun no tienes tareas completadas."
+                    },
                     fontSize = 14.sp,
                     color = TextSecondary
                 )
@@ -240,11 +346,25 @@ fun TasksScreen(
             onClick = { showDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+                .height(64.dp),
+            shape = RoundedCornerShape(32.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
         ) {
-            Text(text = "+ Agregar tarea", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Surface(shape = RoundedCornerShape(50.dp), color = White) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = TaskBrown,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = "Agregar tarea",
+                fontSize = 22.sp,
+                color = TaskBrown,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 
@@ -268,11 +388,32 @@ fun TasksScreen(
 
         AlertDialog(
             onDismissRequest = { showDialog = false },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = TaskDialogBackground,
             title = {
-                Text(text = "Nueva tarea", fontWeight = FontWeight.Bold, color = TextPrimary)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(shape = RoundedCornerShape(50.dp), color = TaskButtonYellow) {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null,
+                            tint = TaskBrown,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Nueva tarea",
+                        fontWeight = FontWeight.Bold,
+                        color = TaskBrown,
+                        fontSize = 24.sp
+                    )
+                }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     OutlinedTextField(
                         value = newTaskTitle,
                         onValueChange = { newTaskTitle = it },
@@ -283,6 +424,14 @@ fun TasksScreen(
                         value = newTaskSubject,
                         onValueChange = { newTaskSubject = it },
                         label = { Text("Materia") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newTaskEmoji,
+                        onValueChange = { newTaskEmoji = it.take(4) },
+                        label = { Text("Emoji") },
+                        placeholder = { Text("Ej: 📘") },
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -297,8 +446,16 @@ fun TasksScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text(text = "Prioridad", fontSize = 13.sp, color = TextSecondary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Prioridad",
+                        fontSize = 14.sp,
+                        color = TextSecondary,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         listOf("Alta", "Media", "Baja").forEach { priority ->
                             val isSelected = selectedPriority == priority
                             val bgColor = when (priority) {
@@ -324,6 +481,7 @@ fun TasksScreen(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
                     }
                 }
@@ -337,6 +495,7 @@ fun TasksScreen(
                                 title = newTaskTitle.trim(),
                                 subject = newTaskSubject.trim().ifBlank { "General" },
                                 priority = selectedPriority,
+                                emoji = newTaskEmoji.trim().ifBlank { defaultTaskEmoji(selectedPriority) },
                                 dueDate = selectedDateText
                             )
                             val updatedTasks = tasks + newTask
@@ -345,12 +504,14 @@ fun TasksScreen(
                             notifyTaskCounts(updatedTasks)
                             newTaskTitle = ""
                             newTaskSubject = ""
+                            newTaskEmoji = ""
                             showDialog = false
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
                 ) {
-                    Text("Agregar")
+                    Text("Agregar", color = TaskBrown, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -366,9 +527,9 @@ fun TasksScreen(
                 confirmButton = {
                     Button(
                         onClick = { showDatePicker = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
                     ) {
-                        Text("Confirmar")
+                        Text("Confirmar", color = TaskBrown)
                     }
                 },
                 dismissButton = {
@@ -378,6 +539,48 @@ fun TasksScreen(
                 }
             ) {
                 DatePicker(state = datePickerState)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskTabChip(
+    text: String,
+    count: Int,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) TaskTabSelected else Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (text == "Pendientes") "📋 $text" else "✓ $text",
+                fontSize = 15.sp,
+                color = if (selected) TaskBrown else TextSecondary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Surface(
+                shape = RoundedCornerShape(50.dp),
+                color = if (text == "Pendientes") PinkPrimary else TealPrimary
+            ) {
+                Text(
+                    text = count.toString(),
+                    fontSize = 13.sp,
+                    color = White,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
             }
         }
     }
@@ -398,22 +601,25 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) Background else White
+            containerColor = if (task.isCompleted) TaskCompletedBackground else White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = task.isCompleted,
                 onCheckedChange = { onToggle(task) },
-                colors = CheckboxDefaults.colors(checkedColor = PurplePrimary)
+                colors = CheckboxDefaults.colors(
+                    checkedColor = TealPrimary,
+                    uncheckedColor = Color(0xFFD9D3C7)
+                )
             )
             Column(
                 modifier = Modifier
@@ -422,9 +628,9 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
             ) {
                 Text(
                     text = task.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (task.isCompleted) TextSecondary else TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (task.isCompleted) TealPrimary else TextPrimary,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -449,9 +655,45 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                     )
                 }
             }
-            TextButton(onClick = { onDelete(task) }) {
-                Text("X", color = TextSecondary, fontSize = 16.sp)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = priorityBg,
+                modifier = Modifier.size(58.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = task.emoji.ifBlank { defaultTaskEmoji(task.priority) },
+                        fontSize = 28.sp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(
+                onClick = { onDelete(task) },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.DeleteOutline,
+                    contentDescription = "Eliminar",
+                    tint = TextSecondary
+                )
             }
         }
     }
 }
+
+private fun defaultTaskEmoji(priority: String): String {
+    return when (priority) {
+        "Alta" -> "💻"
+        "Media" -> "📘"
+        else -> "📒"
+    }
+}
+
+private val TaskWarmBackground = Color(0xFFFFF4C5)
+private val TaskGold = Color(0xFFE8A900)
+private val TaskBrown = Color(0xFF5A1C05)
+private val TaskButtonYellow = Color(0xFFFFC400)
+private val TaskTabSelected = Color(0xFFFFF0B5)
+private val TaskDialogBackground = Color(0xFFFFFBEE)
+private val TaskCompletedBackground = Color(0xFFF5FFF0)

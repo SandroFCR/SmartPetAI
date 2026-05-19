@@ -66,6 +66,7 @@ object FirebaseManager {
                 "title" to task.title,
                 "subject" to task.subject,
                 "priority" to task.priority,
+                "emoji" to task.emoji,
                 "dueDate" to task.dueDate,
                 "isCompleted" to task.isCompleted
             )
@@ -107,6 +108,7 @@ object FirebaseManager {
                     title = doc.getString("title") ?: "",
                     subject = doc.getString("subject") ?: "",
                     priority = doc.getString("priority") ?: "Media",
+                    emoji = doc.getString("emoji") ?: "",
                     dueDate = doc.getString("dueDate") ?: "",
                     isCompleted = doc.getBoolean("isCompleted") ?: false
                 )
