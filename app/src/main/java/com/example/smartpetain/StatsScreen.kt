@@ -1,6 +1,7 @@
 package com.example.smartpetain
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,7 +10,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -262,7 +266,7 @@ fun StatsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             MetricCard(
-                icon = "O",
+                imageRes = R.drawable.sesiones,
                 value = "$completedSessions",
                 title = "Sesiones completas",
                 subtitle = if (completedSessions > 0) "$dailyGoalMinutes min o mas" else "Sin sesiones",
@@ -270,7 +274,7 @@ fun StatsScreen(
             )
 
             MetricCard(
-                icon = "*",
+                imageRes = R.drawable.productividad,
                 value = "$productivity%",
                 title = "Productividad",
                 subtitle = productivityLabel,
@@ -285,15 +289,19 @@ fun StatsScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             MetricCard(
-                icon = "#",
+                imageRes = R.drawable.racha,
                 value = "$currentStreak",
                 title = "Racha actual",
-                subtitle = if (currentStreak == 1) "dia cumplido" else "dias cumplidos",
+                subtitle = when (currentStreak) {
+                    0 -> "Sin racha"
+                    1 -> "día cumplido"
+                    else -> "$currentStreak días cumplidos"
+                }, // <- ¡AQUÍ VA LA COMA QUE FALTA!
                 modifier = Modifier.weight(1f)
             )
 
             MetricCard(
-                icon = "^",
+                imageRes = R.drawable.mejor_dia,
                 value = bestDay?.minutes?.takeIf { it > 0 }?.let { "${it}m" } ?: "0m",
                 title = "Mejor dia",
                 subtitle = bestDayText,
@@ -338,7 +346,7 @@ fun StatsScreen(
 
 @Composable
 private fun MetricCard(
-    icon: String,
+    imageRes: Int,
     value: String,
     title: String,
     subtitle: String,
@@ -346,28 +354,40 @@ private fun MetricCard(
 ) {
     Card(
         modifier = modifier
-            .height(124.dp)
+            .heightIn(min = 124.dp)
             .padding(0.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = White),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = icon, fontSize = 20.sp, color = PurplePrimary)
-            Text(
-                text = value,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-                modifier = Modifier.padding(top = 4.dp)
+        Box(modifier = Modifier.padding(16.dp)) {
+            Image(
+                painter = painterResource(id = imageRes),
+                contentDescription = title,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(44.dp)
             )
-            Text(text = title, fontSize = 10.sp, color = TextSecondary)
-            Text(
-                text = subtitle,
-                fontSize = 10.sp,
-                color = TealPrimary,
-                fontWeight = FontWeight.Bold
-            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp)
+            ) {
+                Text(
+                    text = value,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Text(text = title, fontSize = 10.sp, color = TextSecondary)
+                Text(
+                    text = subtitle,
+                    fontSize = 10.sp,
+                    color = TealPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
