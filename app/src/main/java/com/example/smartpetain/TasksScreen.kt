@@ -313,7 +313,7 @@ fun TasksScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(sortedTasks, key = { it.id }) { task ->
+                items(sortedTasks) { task ->
                     TaskItem(
                         task = task,
                         onToggle = { toggledTask ->
