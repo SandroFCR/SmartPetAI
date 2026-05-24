@@ -19,11 +19,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +78,14 @@ data class CharacterInfo(
     val isActive: Boolean = false
 )
 
+data class CoachRecommendation(
+    val characterName: String,
+    val title: String,
+    val message: String,
+    val reason: String,
+    val weeklyProgress: String
+)
+
 @Composable
 fun CharactersScreen(
     totalStudyMinutes: Int = 0,
@@ -86,6 +96,32 @@ fun CharactersScreen(
         buildCharacters(totalStudyMinutes, completedTasks, pendingTasks)
     }
     var selectedCharacter by remember { mutableStateOf<CharacterInfo?>(null) }
+    var weekStats by remember { mutableStateOf(emptyCharacterWeekStats()) }
+    var dailyGoalMinutes by remember { mutableStateOf(25) }
+    var isCoachLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val profile = FirebaseManager.loadProfile()
+        dailyGoalMinutes = profile.pomodoroDuration
+        weekStats = FirebaseManager.loadWeekStats()
+        isCoachLoading = false
+    }
+
+    val coachRecommendation = remember(
+        weekStats,
+        dailyGoalMinutes,
+        completedTasks,
+        pendingTasks,
+        characters
+    ) {
+        buildCoachRecommendation(
+            weekStats = weekStats,
+            dailyGoalMinutes = dailyGoalMinutes,
+            completedTasks = completedTasks,
+            pendingTasks = pendingTasks,
+            characters = characters
+        )
+    }
 
     selectedCharacter?.let { character ->
         CharacterDetailScreen(
@@ -119,6 +155,14 @@ fun CharactersScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        CoachRecommendationCard(
+            recommendation = coachRecommendation,
+            isLoading = isCoachLoading,
+            characters = characters
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         characters.forEach { character ->
             CharacterCard(
                 character = character,
@@ -127,6 +171,62 @@ fun CharactersScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+private fun buildCoachRecommendation(
+    weekStats: List<DayStats>,
+    dailyGoalMinutes: Int,
+    completedTasks: Int,
+    pendingTasks: Int,
+    characters: List<CharacterInfo>
+): CoachRecommendation {
+    val safeDailyGoal = dailyGoalMinutes.coerceAtLeast(1)
+    val weeklyGoal = safeDailyGoal * 7
+    val effectiveMinutes = weekStats.sumOf { it.minutes.coerceAtMost(safeDailyGoal) }
+    val productivity = ((effectiveMinutes / weeklyGoal.toFloat()) * 100).toInt().coerceIn(0, 100)
+    val remainingWeeklyMinutes = (weeklyGoal - effectiveMinutes).coerceAtLeast(0)
+    val todayStats = weekStats.getOrNull(currentWeekIndex())
+    val todayMinutes = todayStats?.minutes ?: 0
+    val remainingTodayMinutes = (safeDailyGoal - todayMinutes).coerceAtLeast(0)
+
+    val selectedCharacterName = when {
+        pendingTasks >= 3 -> "Hello Kitty"
+        remainingTodayMinutes > 0 -> "Cinnamoroll"
+        completedTasks > 0 && productivity >= 60 -> "Pompompurin"
+        else -> characters.maxByOrNull { it.xp }?.name ?: "Cinnamoroll"
+    }
+
+    val title = when (selectedCharacterName) {
+        "Hello Kitty" -> "Ordena tus pendientes"
+        "Pompompurin" -> "Buen ritmo, cuida tu energia"
+        else -> "Sube tu enfoque de hoy"
+    }
+
+    val message = when {
+        remainingTodayMinutes > 0 -> {
+            "Estudia $remainingTodayMinutes min ahora para cumplir tu meta diaria y subir XP con $selectedCharacterName."
+        }
+        pendingTasks > 0 -> {
+            "Ya cumpliste tu meta de estudio. Completa una tarea pendiente para seguir ganando progreso."
+        }
+        else -> {
+            "Vas al dia. Haz una sesion corta de repaso para mantener tu racha activa."
+        }
+    }
+
+    val reason = when (selectedCharacterName) {
+        "Hello Kitty" -> "Te conviene porque tienes $pendingTasks tareas pendientes y esta mascota mejora con organizacion."
+        "Pompompurin" -> "Te conviene porque ya avanzaste y ahora toca sostener el equilibrio entre estudio y descanso."
+        else -> "Te conviene porque Cinnamoroll crece con tus minutos de enfoque y sesiones Pomodoro."
+    }
+
+    return CoachRecommendation(
+        characterName = selectedCharacterName,
+        title = title,
+        message = message,
+        reason = reason,
+        weeklyProgress = "$effectiveMinutes/$weeklyGoal min esta semana - $productivity%. Faltan $remainingWeeklyMinutes min."
+    )
 }
 
 private fun buildCharacters(
@@ -196,6 +296,107 @@ private fun buildCharacters(
 
 private fun calculateLevel(xp: Int, xpPerLevel: Int): Int {
     return (xp / xpPerLevel + 1).coerceIn(1, 5)
+}
+
+@Composable
+private fun CoachRecommendationCard(
+    recommendation: CoachRecommendation,
+    isLoading: Boolean,
+    characters: List<CharacterInfo>
+) {
+    val character = characters.firstOrNull { it.name == recommendation.characterName } ?: characters.first()
+    val cardColor = characterLightColor(character.color)
+    val accentColor = characterAccentColor(character.color)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CharacterImage(
+                    source = character.imageSource,
+                    name = character.name,
+                    backgroundColorName = character.color,
+                    size = 54
+                )
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Coach de estudio",
+                        fontSize = 12.sp,
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = recommendation.title,
+                        fontSize = 18.sp,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            if (isLoading) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = accentColor,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Analizando tu progreso...",
+                        fontSize = 14.sp,
+                        color = TextSecondary
+                    )
+                }
+            } else {
+                Text(
+                    text = recommendation.message,
+                    fontSize = 14.sp,
+                    color = TextPrimary,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = recommendation.reason,
+                    fontSize = 12.sp,
+                    color = TextSecondary,
+                    lineHeight = 17.sp
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = White.copy(alpha = 0.8f)
+                ) {
+                    Text(
+                        text = recommendation.weeklyProgress,
+                        fontSize = 12.sp,
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -553,4 +754,23 @@ private fun characterAccentColor(colorName: String) = when (colorName) {
     "pink" -> PinkPrimary
     "teal" -> TealPrimary
     else -> PurplePrimary
+}
+
+private fun currentWeekIndex(): Int {
+    val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+    return when (day) {
+        java.util.Calendar.MONDAY -> 0
+        java.util.Calendar.TUESDAY -> 1
+        java.util.Calendar.WEDNESDAY -> 2
+        java.util.Calendar.THURSDAY -> 3
+        java.util.Calendar.FRIDAY -> 4
+        java.util.Calendar.SATURDAY -> 5
+        else -> 6
+    }
+}
+
+private fun emptyCharacterWeekStats(): List<DayStats> {
+    return listOf("Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom").map { day ->
+        DayStats(day = day, minutes = 0)
+    }
 }
