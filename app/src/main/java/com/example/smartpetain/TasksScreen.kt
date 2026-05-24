@@ -187,7 +187,7 @@ fun TasksScreen(
                     .offset(y = 10.dp)
             )
             Image(
-                painter = painterResource(id = R.drawable.penguin_tasks),
+                painter = painterResource(id = R.drawable.pompompurin),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
@@ -205,7 +205,7 @@ fun TasksScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "Organicemos tu dia!✨",
+                        text = "Organicemos tu dia!",
                         fontSize = 16.sp,
                         color = TaskBrown,
                         fontWeight = FontWeight.Bold
