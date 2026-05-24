@@ -1,7 +1,9 @@
 package com.example.smartpetain
 
 import android.net.Uri
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
@@ -25,8 +27,11 @@ data class StudySessionRecord(
 
 object FirebaseManager {
 
+    private const val TAG = "FirebaseManager"
+
     private val db = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
+    private val functions = FirebaseFunctions.getInstance()
     private val userId: String
         get() = FirebaseAuth.getInstance().currentUser?.uid ?: "anonimo"
 
@@ -334,6 +339,47 @@ object FirebaseManager {
             )
         } catch (e: Exception) {
             UserProfile()
+        }
+    }
+
+    suspend fun generateStudyCoachRecommendation(
+        weekStats: List<DayStats>,
+        dailyGoalMinutes: Int,
+        completedTasks: Int,
+        pendingTasks: Int,
+        fallback: CoachRecommendation
+    ): CoachRecommendation {
+        return try {
+            val payload = hashMapOf(
+                "dailyGoalMinutes" to dailyGoalMinutes,
+                "completedTasks" to completedTasks,
+                "pendingTasks" to pendingTasks,
+                "weekStats" to weekStats.map { day ->
+                    hashMapOf(
+                        "day" to day.day,
+                        "minutes" to day.minutes,
+                        "completedSessions" to day.completedSessions
+                    )
+                }
+            )
+
+            val result = functions
+                .getHttpsCallable("generateStudyCoach")
+                .call(payload)
+                .await()
+            val data = result.data as? Map<*, *> ?: return fallback
+
+            CoachRecommendation(
+                characterName = data["characterName"] as? String ?: fallback.characterName,
+                title = data["title"] as? String ?: fallback.title,
+                message = data["message"] as? String ?: fallback.message,
+                reason = data["reason"] as? String ?: fallback.reason,
+                weeklyProgress = data["weeklyProgress"] as? String ?: fallback.weeklyProgress,
+                source = "ai"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "No se pudo generar recomendacion con IA", e)
+            fallback
         }
     }
 

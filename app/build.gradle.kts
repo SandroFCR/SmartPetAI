@@ -51,6 +51,7 @@ dependencies {
 // Auth (para usuario)
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-functions")
     // Compose BOM (maneja todas las versiones automáticamente)
     val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
     implementation(composeBom)

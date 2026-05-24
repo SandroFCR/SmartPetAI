@@ -83,7 +83,8 @@ data class CoachRecommendation(
     val title: String,
     val message: String,
     val reason: String,
-    val weeklyProgress: String
+    val weeklyProgress: String,
+    val source: String = "local"
 )
 
 @Composable
@@ -99,28 +100,41 @@ fun CharactersScreen(
     var weekStats by remember { mutableStateOf(emptyCharacterWeekStats()) }
     var dailyGoalMinutes by remember { mutableStateOf(25) }
     var isCoachLoading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        val profile = FirebaseManager.loadProfile()
-        dailyGoalMinutes = profile.pomodoroDuration
-        weekStats = FirebaseManager.loadWeekStats()
-        isCoachLoading = false
+    var coachRecommendation by remember {
+        mutableStateOf(
+            buildCoachRecommendation(
+                weekStats = weekStats,
+                dailyGoalMinutes = dailyGoalMinutes,
+                completedTasks = completedTasks,
+                pendingTasks = pendingTasks,
+                characters = characters
+            )
+        )
     }
 
-    val coachRecommendation = remember(
-        weekStats,
-        dailyGoalMinutes,
-        completedTasks,
-        pendingTasks,
-        characters
-    ) {
-        buildCoachRecommendation(
-            weekStats = weekStats,
-            dailyGoalMinutes = dailyGoalMinutes,
+    LaunchedEffect(completedTasks, pendingTasks, characters) {
+        isCoachLoading = true
+        val profile = FirebaseManager.loadProfile()
+        val loadedDailyGoalMinutes = profile.pomodoroDuration
+        val loadedWeekStats = FirebaseManager.loadWeekStats()
+        val fallbackRecommendation = buildCoachRecommendation(
+            weekStats = loadedWeekStats,
+            dailyGoalMinutes = loadedDailyGoalMinutes,
             completedTasks = completedTasks,
             pendingTasks = pendingTasks,
             characters = characters
         )
+        dailyGoalMinutes = loadedDailyGoalMinutes
+        weekStats = loadedWeekStats
+        coachRecommendation = fallbackRecommendation
+        coachRecommendation = FirebaseManager.generateStudyCoachRecommendation(
+            weekStats = loadedWeekStats,
+            dailyGoalMinutes = loadedDailyGoalMinutes,
+            completedTasks = completedTasks,
+            pendingTasks = pendingTasks,
+            fallback = fallbackRecommendation
+        )
+        isCoachLoading = false
     }
 
     selectedCharacter?.let { character ->
@@ -330,7 +344,7 @@ private fun CoachRecommendationCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Coach de estudio",
+                        text = if (recommendation.source == "ai") "Coach IA activa" else "Coach local",
                         fontSize = 12.sp,
                         color = accentColor,
                         fontWeight = FontWeight.Bold
