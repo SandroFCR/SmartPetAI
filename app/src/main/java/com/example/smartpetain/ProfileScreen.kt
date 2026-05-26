@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
@@ -62,7 +63,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ProfileScreen(
     totalStudyMinutes: Int = 0,
-    completedTasks: Int = 0
+    completedTasks: Int = 0,
+    onLogout: () -> Unit = {}
 ) {
     var profile by remember { mutableStateOf(UserProfile(name = "Cargando...")) }
     var editingName by remember { mutableStateOf(false) }
@@ -344,6 +346,32 @@ fun ProfileScreen(
                     )
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onLogout,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = PurpleLight,
+                contentColor = PurplePrimary
+            )
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.Logout,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Cerrar sesion",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))

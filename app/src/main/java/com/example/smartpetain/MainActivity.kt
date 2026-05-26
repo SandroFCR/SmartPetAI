@@ -89,7 +89,12 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (isLoggedIn) {
-                    AppNavigator()
+                    AppNavigator(
+                        onLogout = {
+                            auth.signOut()
+                            isLoggedIn = false
+                        }
+                    )
                 } else {
                     AuthScreen(onAuthSuccess = { isLoggedIn = true })
                 }
@@ -105,7 +110,9 @@ data class NavItem(
 )
 
 @Composable
-fun AppNavigator() {
+fun AppNavigator(
+    onLogout: () -> Unit
+) {
     val scope = rememberCoroutineScope()
 
     var currentScreen by remember { mutableStateOf("dashboard") }
@@ -214,7 +221,11 @@ fun AppNavigator() {
 
                 "profile" -> ProfileScreen(
                     totalStudyMinutes = totalStudyMinutes,
-                    completedTasks = completedTasks
+                    completedTasks = completedTasks,
+                    onLogout = {
+                        currentScreen = "dashboard"
+                        onLogout()
+                    }
                 )
             }
         }
