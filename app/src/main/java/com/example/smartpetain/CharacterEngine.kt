@@ -20,21 +20,30 @@ data class Character(
 object CharacterEngine {
 
     fun getCharacter(
+        equippedPetName: String,
         studyMinutes: Int,
         minutesSinceBreak: Int,
         pendingTasks: Int,
-        completedTasks: Int
+        completedTasks: Int,
+        petLevel: Int = 1
     ): Character {
-        val state = analyzeState(studyMinutes, minutesSinceBreak, pendingTasks, completedTasks)
-        return when (state) {
-            UserState.SATURATED -> pompompurin(minutesSinceBreak)
-            UserState.DISORGANIZED -> helloKitty(pendingTasks)
-            UserState.FOCUSED -> cinnamoroll(studyMinutes)
+        val state = analyzeState(minutesSinceBreak, pendingTasks, completedTasks)
+        
+        // Prioridad 1: Alerta de Saturación (Pompompurin siempre avisa)
+        if (state == UserState.SATURATED) return pompompurinAlert(minutesSinceBreak)
+        
+        // Prioridad 2: Alerta de Desorganización (Hello Kitty siempre avisa)
+        if (state == UserState.DISORGANIZED) return helloKittyAlert(pendingTasks)
+
+        // Prioridad 3: Mascota equipada en estado normal (FOCUSED)
+        return when (equippedPetName) {
+            "Pompompurin" -> pompompurinFocused(studyMinutes, petLevel)
+            "Hello Kitty" -> helloKittyFocused(studyMinutes, petLevel)
+            else -> cinnamorollFocused(studyMinutes, petLevel)
         }
     }
 
     private fun analyzeState(
-        studyMinutes: Int,
         minutesSinceBreak: Int,
         pendingTasks: Int,
         completedTasks: Int
@@ -49,12 +58,11 @@ object CharacterEngine {
         return UserState.FOCUSED
     }
 
-    private fun cinnamoroll(studyMinutes: Int): Character {
+    private fun cinnamorollFocused(studyMinutes: Int, level: Int): Character {
         val message = when {
-            studyMinutes >= 60 -> "¡Increíble! Llevas más de una hora. ¡Eres una máquina! 🌟"
-            studyMinutes >= 25 -> "¡Vas muy bien! Completaste un Pomodoro. ¡Sigue así! 💙"
-            studyMinutes >= 10 -> "¡Buen ritmo! Cada minuto cuenta 🌱"
-            else -> "¡Tú puedes! Concéntrate en tu meta de hoy ✨"
+            studyMinutes >= 60 -> "¡Increíble nivel $level! Llevas más de una hora enfocada. 🌟"
+            studyMinutes >= 25 -> "¡Buen trabajo! Completaste un Pomodoro. ¡Sigue así! 💙"
+            else -> "¡Tú puedes! Concéntrate en tu meta. (Nivel $level) ✨"
         }
         return Character(
             name = "Cinnamoroll",
@@ -65,11 +73,10 @@ object CharacterEngine {
         )
     }
 
-    private fun pompompurin(minutesSinceBreak: Int): Character {
+    private fun pompompurinFocused(studyMinutes: Int, level: Int): Character {
         val message = when {
-            minutesSinceBreak >= 90 -> "¡Oye! Llevas ${minutesSinceBreak} min sin descansar. ¡Para ya! 😴"
-            minutesSinceBreak >= 70 -> "Tu cerebro necesita un respiro. ¡Toma 10 minutos! ☕"
-            else -> "Parece que has estudiado mucho. ¡Hora de una pausa! 🍮"
+            studyMinutes >= 45 -> "¡Nivel $level alcanzado! Estás haciendo un gran esfuerzo. 🍮"
+            else -> "Me encanta verte estudiar con calma. (Nivel $level) ✨"
         }
         return Character(
             name = "Pompompurin",
@@ -80,11 +87,38 @@ object CharacterEngine {
         )
     }
 
-    private fun helloKitty(pendingTasks: Int): Character {
+    private fun helloKittyFocused(studyMinutes: Int, level: Int): Character {
+        val message = when {
+            studyMinutes >= 30 -> "¡Nivel $level! Todo está bajo control y bien organizado. 🎀"
+            else -> "¡Qué ordenado está todo! Sigamos así. (Nivel $level) 💕"
+        }
+        return Character(
+            name = "Hello Kitty",
+            emoji = "🎀",
+            role = "Organización",
+            message = message,
+            color = "pink"
+        )
+    }
+
+    private fun pompompurinAlert(minutesSinceBreak: Int): Character {
+        val message = when {
+            minutesSinceBreak >= 90 -> "¡Oye! Llevas ${minutesSinceBreak} min sin descansar. ¡Para ya! 😴"
+            else -> "Tu cerebro necesita un respiro. ¡Toma 10 minutos! ☕"
+        }
+        return Character(
+            name = "Pompompurin",
+            emoji = "🐶",
+            role = "Descanso y equilibrio",
+            message = message,
+            color = "amber"
+        )
+    }
+
+    private fun helloKittyAlert(pendingTasks: Int): Character {
         val message = when {
             pendingTasks >= 5 -> "¡Tienes $pendingTasks tareas pendientes! Organicémonos 📋"
-            pendingTasks >= 3 -> "Tienes $pendingTasks tareas por hacer. ¡Empecemos por la más importante! 🎀"
-            else -> "Recuerda planificar tu día. ¡Yo te ayudo! 💕"
+            else -> "Tienes $pendingTasks tareas por hacer. ¡Empecemos! 🎀"
         }
         return Character(
             name = "Hello Kitty",

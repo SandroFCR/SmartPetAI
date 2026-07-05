@@ -15,7 +15,8 @@ import java.util.Locale
 data class UserProfile(
     val name: String = "Estudiante",
     val pomodoroDuration: Int = 25,
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val equippedPet: String = "Cinnamoroll"
 )
 
 data class StudySessionRecord(
@@ -24,6 +25,14 @@ data class StudySessionRecord(
     val date: String,
     val timestamp: Long
 )
+
+data class PetStats(
+    val name: String = "",
+    val level: Int = 1,
+    val xp: Int = 0
+) {
+    val maxXp: Int get() = level * 100
+}
 
 object FirebaseManager {
 
@@ -58,17 +67,18 @@ object FirebaseManager {
             if (updateDailyStats) {
                 saveDailyStats(minutes)
             }
-            incrementDailyCompletedSessions()
+            incrementDailyStat("completedSessions")
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
     suspend fun saveTask(task: Task) {
+        Log.d(TAG, "Saving task for user $userId: ${task.name}")
         try {
             val taskMap = hashMapOf(
                 "id" to task.id,
-                "title" to task.title,
+                "name" to task.name,
                 "subject" to task.subject,
                 "priority" to task.priority,
                 "emoji" to task.emoji,
@@ -81,8 +91,9 @@ object FirebaseManager {
                 .document(task.id.toString())
                 .set(taskMap)
                 .await()
+            Log.d(TAG, "Task saved successfully")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error saving task", e)
         }
     }
 
@@ -100,6 +111,7 @@ object FirebaseManager {
     }
 
     suspend fun loadTasks(): List<Task> {
+        Log.d(TAG, "Loading tasks for user $userId")
         return try {
             val snapshot = db.collection("users")
                 .document(userId)
@@ -107,34 +119,23 @@ object FirebaseManager {
                 .get()
                 .await()
 
-            snapshot.documents.mapNotNull { doc ->
-                val task = Task(
+            val tasks = snapshot.documents.mapNotNull { doc ->
+                Task(
                     id = (doc.getLong("id") ?: 0).toInt(),
-                    title = doc.getString("title") ?: "",
+                    name = doc.getString("name") ?: doc.getString("title") ?: "",
                     subject = doc.getString("subject") ?: "",
                     priority = doc.getString("priority") ?: "Media",
                     emoji = doc.getString("emoji") ?: "",
                     dueDate = doc.getString("dueDate") ?: "",
                     isCompleted = doc.getBoolean("isCompleted") ?: false
                 )
-                if (isSampleTask(task)) {
-                    doc.reference.delete().await()
-                    null
-                } else {
-                    task
-                }
             }
+            Log.d(TAG, "Loaded ${tasks.size} tasks")
+            tasks
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error loading tasks", e)
             emptyList()
         }
-    }
-
-    private fun isSampleTask(task: Task): Boolean {
-        return task.title == "Resolver ejercicios de integrales" ||
-            task.title.startsWith("Leer cap") ||
-            task.title == "Proyecto en Flutter" ||
-            task.title == "Practicar tiempos verbales"
     }
 
     suspend fun saveDailyStats(minutes: Int) {
@@ -159,12 +160,13 @@ object FirebaseManager {
                     SetOptions.merge()
                 )
             }.await()
+            checkDailyMissions()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private suspend fun incrementDailyCompletedSessions() {
+    suspend fun incrementDailyStat(statName: String) {
         try {
             val date = getCurrentDate()
             val statsRef = db.collection("users")
@@ -174,18 +176,64 @@ object FirebaseManager {
 
             db.runTransaction { transaction ->
                 val current = transaction.get(statsRef)
-                val currentSessions = current.getLong("completedSessions")?.toInt() ?: 0
+                val currentVal = current.getLong(statName)?.toInt() ?: 0
                 transaction.set(
                     statsRef,
                     hashMapOf(
                         "date" to date,
-                        "completedSessions" to (currentSessions + 1)
+                        statName to (currentVal + 1)
                     ),
                     SetOptions.merge()
                 )
             }.await()
+            checkDailyMissions()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    suspend fun checkDailyMissions() {
+        try {
+            val date = getCurrentDate()
+            val statsRef = db.collection("users")
+                .document(userId)
+                .collection("dailyStats")
+                .document(date)
+
+            val snapshot = statsRef.get().await()
+            if (!snapshot.exists()) return
+
+            val minutes = snapshot.getLong("minutes") ?: 0
+            val completedSessions = snapshot.getLong("completedSessions") ?: 0
+            val createdTasks = snapshot.getLong("createdTasks") ?: 0
+            val completedTasks = snapshot.getLong("completedTasks") ?: 0
+            val breaks = snapshot.getLong("breaks") ?: 0
+            val completedMissions = (snapshot.get("completedMissions") as? List<*>)?.map { it.toString().toInt() } ?: emptyList()
+
+            // Cinnamoroll 1: Completa un Pomodoro (101)
+            if (!completedMissions.contains(101) && completedSessions >= 1) {
+                completeDailyMission("Cinnamoroll", 101, 25)
+            }
+            // Cinnamoroll 2: Estudia 10 min (102)
+            if (!completedMissions.contains(102) && minutes >= 10) {
+                completeDailyMission("Cinnamoroll", 102, 10)
+            }
+            // Pompompurin 1: Descansa 5 min (201)
+            if (!completedMissions.contains(201) && breaks >= 1) {
+                completeDailyMission("Pompompurin", 201, 15)
+            }
+            // Pompompurin 2: Cierra una tarea (202)
+            if (!completedMissions.contains(202) && completedTasks >= 1) {
+                completeDailyMission("Pompompurin", 202, 20)
+            }
+            // Hello Kitty 1: Agrega una tarea (301)
+            if (!completedMissions.contains(301) && createdTasks >= 1) {
+                completeDailyMission("Hello Kitty", 301, 10)
+            }
+            // Hello Kitty 2: Ordena por prioridad (302)
+            // Se activa manualmente en la UI
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking missions", e)
         }
     }
 
@@ -197,22 +245,18 @@ object FirebaseManager {
                 .get()
                 .await()
 
-            val minutesByDate = snapshot.documents.associate { doc ->
-                val date = doc.getString("date") ?: doc.id
-                val minutes = (doc.getLong("minutes") ?: 0).toInt()
-                date to minutes
-            }
-            val completedByDate = snapshot.documents.associate { doc ->
-                val date = doc.getString("date") ?: doc.id
-                val completedSessions = (doc.getLong("completedSessions") ?: 0).toInt()
-                date to completedSessions
-            }
+            val statsMap = snapshot.documents.associateBy { it.getString("date") ?: it.id }
 
             getCurrentWeekDates().map { (label, date) ->
+                val doc = statsMap[date]
                 DayStats(
                     day = label,
-                    minutes = minutesByDate[date] ?: 0,
-                    completedSessions = completedByDate[date] ?: 0
+                    minutes = (doc?.getLong("minutes") ?: 0).toInt(),
+                    completedSessions = (doc?.getLong("completedSessions") ?: 0).toInt(),
+                    createdTasks = (doc?.getLong("createdTasks") ?: 0).toInt(),
+                    completedTasks = (doc?.getLong("completedTasks") ?: 0).toInt(),
+                    breaks = (doc?.getLong("breaks") ?: 0).toInt(),
+                    completedMissions = (doc?.get("completedMissions") as? List<*>)?.map { it.toString().toInt() } ?: emptyList()
                 )
             }
         } catch (e: Exception) {
@@ -263,6 +307,7 @@ object FirebaseManager {
     }
 
     suspend fun saveProfile(profile: UserProfile) {
+        Log.d(TAG, "Saving profile for user $userId: ${profile.name}")
         try {
             db.collection("users")
                 .document(userId)
@@ -272,13 +317,15 @@ object FirebaseManager {
                     hashMapOf(
                         "name" to profile.name,
                         "pomodoroDuration" to profile.pomodoroDuration,
-                        "avatarUrl" to profile.avatarUrl
+                        "avatarUrl" to profile.avatarUrl,
+                        "equippedPet" to profile.equippedPet
                     ),
                     SetOptions.merge()
                 )
                 .await()
+            Log.d(TAG, "Profile saved successfully")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error saving profile", e)
         }
     }
 
@@ -335,10 +382,114 @@ object FirebaseManager {
             UserProfile(
                 name = doc.getString("name") ?: "Estudiante",
                 pomodoroDuration = doc.getLong("pomodoroDuration")?.toInt() ?: 25,
-                avatarUrl = doc.getString("avatarUrl")
+                avatarUrl = doc.getString("avatarUrl"),
+                equippedPet = doc.getString("equippedPet") ?: "Cinnamoroll"
             )
         } catch (e: Exception) {
             UserProfile()
+        }
+    }
+
+    suspend fun loadPets(): List<PetStats> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(userId)
+                .collection("pets")
+                .get()
+                .await()
+
+            if (snapshot.isEmpty) {
+                val initialPets = listOf(
+                    PetStats("Cinnamoroll"),
+                    PetStats("Pompompurin"),
+                    PetStats("Hello Kitty")
+                )
+                initialPets.forEach { pet ->
+                    db.collection("users")
+                        .document(userId)
+                        .collection("pets")
+                        .document(pet.name)
+                        .set(pet)
+                        .await()
+                }
+                initialPets
+            } else {
+                snapshot.documents.map { doc ->
+                    PetStats(
+                        name = doc.getString("name") ?: doc.id,
+                        level = (doc.getLong("level") ?: 1).toInt(),
+                        xp = (doc.getLong("xp") ?: 0).toInt()
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun addPetXp(petName: String, amount: Int) {
+        try {
+            val petRef = db.collection("users")
+                .document(userId)
+                .collection("pets")
+                .document(petName)
+
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(petRef)
+                val currentLevel = snapshot.getLong("level")?.toInt() ?: 1
+                val currentXp = snapshot.getLong("xp")?.toInt() ?: 0
+
+                var newXp = currentXp + amount
+                var newLevel = currentLevel
+                val maxXp = newLevel * 100
+
+                if (newXp >= maxXp && newLevel < 5) {
+                    newXp -= maxXp
+                    newLevel++
+                }
+
+                transaction.update(petRef, "xp", newXp, "level", newLevel)
+            }.await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun saveEquippedPet(petName: String) {
+        try {
+            db.collection("users")
+                .document(userId)
+                .collection("profile")
+                .document("data")
+                .set(hashMapOf("equippedPet" to petName), SetOptions.merge())
+                .await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun completeDailyMission(petName: String, missionIndex: Int, xpReward: Int) {
+        try {
+            val date = getCurrentDate()
+            val statsRef = db.collection("users")
+                .document(userId)
+                .collection("dailyStats")
+                .document(date)
+
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(statsRef)
+                val completedMissions = (snapshot.get("completedMissions") as? List<*>)?.map { it.toString().toInt() }?.toMutableList() ?: mutableListOf()
+                
+                if (!completedMissions.contains(missionIndex)) {
+                    completedMissions.add(missionIndex)
+                    transaction.set(statsRef, hashMapOf("completedMissions" to completedMissions), SetOptions.merge())
+                }
+            }.await()
+            
+            addPetXp(petName, xpReward)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -347,6 +498,7 @@ object FirebaseManager {
         dailyGoalMinutes: Int,
         completedTasks: Int,
         pendingTasks: Int,
+        pets: List<PetStats>,
         fallback: CoachRecommendation
     ): CoachRecommendation {
         return try {
@@ -354,6 +506,13 @@ object FirebaseManager {
                 "dailyGoalMinutes" to dailyGoalMinutes,
                 "completedTasks" to completedTasks,
                 "pendingTasks" to pendingTasks,
+                "pets" to pets.map { pet ->
+                    hashMapOf(
+                        "name" to pet.name,
+                        "level" to pet.level,
+                        "xp" to pet.xp
+                    )
+                },
                 "weekStats" to weekStats.map { day ->
                     hashMapOf(
                         "day" to day.day,

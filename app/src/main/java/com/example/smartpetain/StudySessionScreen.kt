@@ -58,6 +58,7 @@ private enum class PomodoroPhase {
 fun StudySessionScreen(
     onBack: () -> Unit,
     sessionDurationMinutes: Int = 25,
+    startAsBreak: Boolean = false,
     onPomodoroChanged: (Int) -> Unit = {},
     onMinuteStudied: (Int) -> Unit = {},
     onSessionFinished: (Int) -> Unit = {},
@@ -65,9 +66,11 @@ fun StudySessionScreen(
 ) {
     val breakDurationSeconds = 5 * 60
     val studyDurationSeconds = sessionDurationMinutes * 60
-    var phase by remember { mutableStateOf(PomodoroPhase.STUDY) }
-    var timeLeft by remember(sessionDurationMinutes) { mutableStateOf(studyDurationSeconds) }
-    var isRunning by remember { mutableStateOf(false) }
+    var phase by remember { mutableStateOf(if (startAsBreak) PomodoroPhase.BREAK else PomodoroPhase.STUDY) }
+    var timeLeft by remember(sessionDurationMinutes, startAsBreak) {
+        mutableStateOf(if (startAsBreak) breakDurationSeconds else studyDurationSeconds)
+    }
+    var isRunning by remember { mutableStateOf(startAsBreak) }
     var sessionTime by remember { mutableStateOf(0) }
     var lastMinuteReported by remember { mutableStateOf(0) }
     var recentSessions by remember { mutableStateOf<List<StudySessionRecord>>(emptyList()) }

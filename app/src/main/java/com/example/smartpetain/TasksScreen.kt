@@ -74,7 +74,7 @@ import kotlinx.coroutines.launch
 
 data class Task(
     val id: Int,
-    val title: String,
+    val name: String,
     val subject: String,
     val priority: String,
     val emoji: String = "",
@@ -85,31 +85,19 @@ data class Task(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(
+    tasks: List<Task>,
     onBack: () -> Unit,
-    onTasksChanged: (Int, Int) -> Unit = { _, _ -> }
+    initialOpenAddDialog: Boolean = false,
+    initialSortBy: String = "",
+    onTasksChanged: (List<Task>) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
-    var isLoading by remember { mutableStateOf(true) }
-    var tasks by remember { mutableStateOf(emptyList<Task>()) }
-    var showDialog by remember { mutableStateOf(false) }
-    var sortBy by remember { mutableStateOf("none") }
+    var showDialog by remember { mutableStateOf(initialOpenAddDialog) }
+    var sortBy by remember { mutableStateOf(initialSortBy.ifBlank { "none" }) }
     var selectedTab by remember { mutableStateOf("pending") }
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskSubject by remember { mutableStateOf("") }
     var newTaskEmoji by remember { mutableStateOf("") }
-
-    fun notifyTaskCounts(currentTasks: List<Task>) {
-        onTasksChanged(
-            currentTasks.count { !it.isCompleted },
-            currentTasks.count { it.isCompleted }
-        )
-    }
-
-    LaunchedEffect(Unit) {
-        tasks = FirebaseManager.loadTasks()
-        notifyTaskCounts(tasks)
-        isLoading = false
-    }
 
     val completedCount = tasks.count { it.isCompleted }
     val pendingCount = tasks.count { !it.isCompleted }
@@ -122,18 +110,6 @@ fun TasksScreen(
         "priority" -> visibleTasks.sortedBy { priorityOrder[it.priority] ?: 3 }
         "date" -> visibleTasks.sortedBy { it.dueDate.ifBlank { "9999-99-99" } }
         else -> visibleTasks
-    }
-
-    if (isLoading) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(TaskWarmBackground),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = TaskGold)
-        }
-        return
     }
 
     Column(
@@ -324,16 +300,19 @@ fun TasksScreen(
                                     it
                                 }
                             }
-                            tasks = updatedTasks
+                            onTasksChanged(updatedTasks)
                             val updatedTask = updatedTasks.first { it.id == toggledTask.id }
-                            scope.launch { FirebaseManager.saveTask(updatedTask) }
-                            notifyTaskCounts(updatedTasks)
+                            scope.launch { 
+                                FirebaseManager.saveTask(updatedTask)
+                                if (updatedTask.isCompleted) {
+                                    FirebaseManager.incrementDailyStat("completedTasks")
+                                }
+                            }
                         },
                         onDelete = { deletedTask ->
                             val updatedTasks = tasks.filter { it.id != deletedTask.id }
-                            tasks = updatedTasks
+                            onTasksChanged(updatedTasks)
                             scope.launch { FirebaseManager.deleteTask(deletedTask.id) }
-                            notifyTaskCounts(updatedTasks)
                         }
                     )
                 }
@@ -492,16 +471,18 @@ fun TasksScreen(
                         if (newTaskTitle.isNotBlank()) {
                             val newTask = Task(
                                 id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
-                                title = newTaskTitle.trim(),
+                                name = newTaskTitle.trim(),
                                 subject = newTaskSubject.trim().ifBlank { "General" },
                                 priority = selectedPriority,
                                 emoji = newTaskEmoji.trim().ifBlank { defaultTaskEmoji(selectedPriority) },
                                 dueDate = selectedDateText
                             )
                             val updatedTasks = tasks + newTask
-                            tasks = updatedTasks
-                            scope.launch { FirebaseManager.saveTask(newTask) }
-                            notifyTaskCounts(updatedTasks)
+                            onTasksChanged(updatedTasks)
+                            scope.launch { 
+                                FirebaseManager.saveTask(newTask)
+                                FirebaseManager.incrementDailyStat("createdTasks")
+                            }
                             newTaskTitle = ""
                             newTaskSubject = ""
                             newTaskEmoji = ""
@@ -627,7 +608,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                     .padding(start = 8.dp)
             ) {
                 Text(
-                    text = task.title,
+                    text = task.name,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (task.isCompleted) TealPrimary else TextPrimary,

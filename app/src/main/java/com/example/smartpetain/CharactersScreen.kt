@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,7 +63,10 @@ sealed class ImageSource {
 data class CharacterTip(
     val title: String,
     val description: String,
-    val points: Int
+    val points: Int,
+    val action: String = "",
+    val index: Int = 0,
+    val isCompleted: Boolean = false
 )
 
 data class CharacterInfo(
@@ -91,10 +97,15 @@ data class CoachRecommendation(
 fun CharactersScreen(
     totalStudyMinutes: Int = 0,
     completedTasks: Int = 0,
-    pendingTasks: Int = 0
+    pendingTasks: Int = 0,
+    petStatsList: List<PetStats> = emptyList(),
+    equippedPetName: String = "Cinnamoroll",
+    todayCompletedMissions: List<Int> = emptyList(),
+    onEquipPet: (String) -> Unit = {},
+    onMissionAction: (String) -> Unit = {}
 ) {
-    val characters = remember(totalStudyMinutes, completedTasks, pendingTasks) {
-        buildCharacters(totalStudyMinutes, completedTasks, pendingTasks)
+    val characters = remember(petStatsList, equippedPetName, todayCompletedMissions) {
+        buildCharactersFromStats(petStatsList, equippedPetName, todayCompletedMissions)
     }
     var selectedCharacter by remember { mutableStateOf<CharacterInfo?>(null) }
     var weekStats by remember { mutableStateOf(emptyCharacterWeekStats()) }
@@ -112,11 +123,15 @@ fun CharactersScreen(
         )
     }
 
-    LaunchedEffect(completedTasks, pendingTasks, characters) {
+    LaunchedEffect(petStatsList, characters) {
         isCoachLoading = true
         val profile = FirebaseManager.loadProfile()
         val loadedDailyGoalMinutes = profile.pomodoroDuration
         val loadedWeekStats = FirebaseManager.loadWeekStats()
+        
+        dailyGoalMinutes = loadedDailyGoalMinutes
+        weekStats = loadedWeekStats
+        
         val fallbackRecommendation = buildCoachRecommendation(
             weekStats = loadedWeekStats,
             dailyGoalMinutes = loadedDailyGoalMinutes,
@@ -124,14 +139,14 @@ fun CharactersScreen(
             pendingTasks = pendingTasks,
             characters = characters
         )
-        dailyGoalMinutes = loadedDailyGoalMinutes
-        weekStats = loadedWeekStats
         coachRecommendation = fallbackRecommendation
+        
         coachRecommendation = FirebaseManager.generateStudyCoachRecommendation(
             weekStats = loadedWeekStats,
             dailyGoalMinutes = loadedDailyGoalMinutes,
             completedTasks = completedTasks,
             pendingTasks = pendingTasks,
+            pets = petStatsList,
             fallback = fallbackRecommendation
         )
         isCoachLoading = false
@@ -140,7 +155,15 @@ fun CharactersScreen(
     selectedCharacter?.let { character ->
         CharacterDetailScreen(
             character = character,
-            onBack = { selectedCharacter = null }
+            onBack = { selectedCharacter = null },
+            onEquip = { 
+                onEquipPet(character.name)
+                selectedCharacter = null
+            },
+            onMissionClick = { action ->
+                onMissionAction(action)
+                selectedCharacter = null
+            }
         )
         return
     }
@@ -161,7 +184,7 @@ fun CharactersScreen(
             color = TextPrimary
         )
         Text(
-            text = "Toca una mascota para ver su progreso.",
+            text = "Mascota equipada: $equippedPetName",
             fontSize = 14.sp,
             color = TextSecondary,
             modifier = Modifier.padding(top = 4.dp)
@@ -243,73 +266,69 @@ private fun buildCoachRecommendation(
     )
 }
 
-private fun buildCharacters(
-    totalStudyMinutes: Int,
-    completedTasks: Int,
-    pendingTasks: Int
+private fun buildCharactersFromStats(
+    petStatsList: List<PetStats>,
+    equippedPetName: String,
+    todayCompletedMissions: List<Int>
 ): List<CharacterInfo> {
-    val cinnamorollXp = totalStudyMinutes.coerceAtMost(150)
-    val pompompurinXp = (completedTasks * 20).coerceAtMost(100)
-    val helloKittyXp = ((completedTasks * 12) + (pendingTasks.coerceAtMost(5) * 4)).coerceAtMost(80)
-
-    return listOf(
-        CharacterInfo(
-            name = "Cinnamoroll",
-            imageSource = ImageSource.Local(R.drawable.cinnamoroll),
-            role = "Motivacion y enfoque",
-            description = "Sube cuando estudias y completas sesiones Pomodoro.",
-            trigger = "Aparece al estudiar 25+ min seguidos",
-            level = calculateLevel(cinnamorollXp, 50),
-            xp = cinnamorollXp,
-            maxXp = 150,
-            color = "purple",
-            detailMessage = "Cinnamoroll crece con tus minutos de estudio. Mientras mas constante seas, mas rapido sube de nivel.",
-            tips = listOf(
-                CharacterTip("Completa una sesion Pomodoro", "Estudia sin pausar hasta terminar el temporizador.", 25),
-                CharacterTip("Estudia 10 minutos extra", "Suma minutos de enfoque para acercarte al siguiente nivel.", 10),
-                CharacterTip("Revisa tus estadisticas", "Mira tu progreso semanal para mantener la rutina.", 5)
-            ),
-            isActive = true
-        ),
-        CharacterInfo(
-            name = "Pompompurin",
-            imageSource = ImageSource.Local(R.drawable.pompompurin),
-            role = "Descanso y equilibrio",
-            description = "Sube cuando mantienes buenos habitos y completas tareas sin saturarte.",
-            trigger = "Aparece tras 50+ min sin descanso",
-            level = calculateLevel(pompompurinXp, 40),
-            xp = pompompurinXp,
-            maxXp = 100,
-            color = "amber",
-            detailMessage = "Pompompurin te ayuda a descansar a tiempo. Mejora cuando equilibras avance con pausas sanas.",
-            tips = listOf(
-                CharacterTip("Descansa 5 minutos", "Haz una pausa real despues de una sesion intensa.", 10),
-                CharacterTip("Completa una tarea pendiente", "Cerrar tareas reduce carga mental y sube su progreso.", 20),
-                CharacterTip("Evita estudiar demasiado seguido", "Cuando el timer pida descanso, tomalo antes de seguir.", 10)
+    return listOf("Cinnamoroll", "Pompompurin", "Hello Kitty").map { petName ->
+        val stats = petStatsList.find { it.name == petName } ?: PetStats(petName)
+        val level = stats.level
+        
+        when (petName) {
+            "Cinnamoroll" -> CharacterInfo(
+                name = "Cinnamoroll",
+                imageSource = ImageSource.Local(R.drawable.cinnamoroll),
+                role = "Motivacion y enfoque",
+                description = "Sube cuando estudias y completas sesiones Pomodoro.",
+                trigger = "Aparece al estudiar 25+ min seguidos",
+                level = level,
+                xp = stats.xp,
+                maxXp = stats.maxXp,
+                color = "purple",
+                detailMessage = "Cinnamoroll crece con tus minutos de estudio. Mientras mas constante seas, mas rapido sube de nivel.",
+                tips = listOf(
+                    CharacterTip("Completa un Pomodoro", "Estudia hasta terminar el timer.", 20 + (level * 5), "start_study", 101),
+                    CharacterTip("Estudia 10 min", "Minutos extra para tu nivel.", 10, "start_study", 102)
+                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
+                isActive = equippedPetName == "Cinnamoroll"
             )
-        ),
-        CharacterInfo(
-            name = "Hello Kitty",
-            imageSource = ImageSource.Remote("https://static.wikia.nocookie.net/hellokitty/images/5/52/Sanrio_Characters_Hello_Kitty_Image026.png/revision/latest?cb=20250110105831"),
-            role = "Organizacion",
-            description = "Sube cuando organizas tus pendientes y conviertes tareas en avance real.",
-            trigger = "Aparece con 3+ tareas pendientes",
-            level = calculateLevel(helloKittyXp, 30),
-            xp = helloKittyXp,
-            maxXp = 80,
-            color = "pink",
-            detailMessage = "Hello Kitty mejora cuando tus tareas estan claras. Agrega pendientes, ordenalos y completa los mas importantes.",
-            tips = listOf(
-                CharacterTip("Agrega tus tareas reales", "Registra lo que debes hacer para que la app pueda ayudarte.", 8),
-                CharacterTip("Completa una tarea", "Marca una tarea como completada para ganar progreso.", 12),
-                CharacterTip("Ordena por prioridad", "Empieza por lo mas urgente y deja menos ruido en tu lista.", 6)
+            "Pompompurin" -> CharacterInfo(
+                name = "Pompompurin",
+                imageSource = ImageSource.Local(R.drawable.pompompurin),
+                role = "Descanso y equilibrio",
+                description = "Sube cuando mantienes buenos habitos y descansas.",
+                trigger = "Aparece tras 50+ min sin descanso",
+                level = level,
+                xp = stats.xp,
+                maxXp = stats.maxXp,
+                color = "amber",
+                detailMessage = "Pompompurin te ayuda a descansar a tiempo. Mejora cuando equilibras avance con pausas sanas.",
+                tips = listOf(
+                    CharacterTip("Descansa 5 min", "Toma una pausa real.", 15 + (level * 2), "take_break", 201),
+                    CharacterTip("Cierra una tarea", "Reduce tu carga mental.", 20, "add_task", 202)
+                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
+                isActive = equippedPetName == "Pompompurin"
             )
-        )
-    )
-}
-
-private fun calculateLevel(xp: Int, xpPerLevel: Int): Int {
-    return (xp / xpPerLevel + 1).coerceIn(1, 5)
+            else -> CharacterInfo(
+                name = "Hello Kitty",
+                imageSource = ImageSource.Remote("https://static.wikia.nocookie.net/hellokitty/images/5/52/Sanrio_Characters_Hello_Kitty_Image026.png/revision/latest?cb=20250110105831"),
+                role = "Organizacion",
+                description = "Sube cuando organizas tus pendientes.",
+                trigger = "Aparece con 3+ tareas pendientes",
+                level = level,
+                xp = stats.xp,
+                maxXp = stats.maxXp,
+                color = "pink",
+                detailMessage = "Hello Kitty mejora cuando tus tareas estan claras. Registra y ordena tus pendientes.",
+                tips = listOf(
+                    CharacterTip("Agrega una tarea", "Registra lo que debes hacer.", 10 + (level * 3), "add_task", 301),
+                    CharacterTip("Ordena por prioridad", "Empieza por lo urgente.", 10, "sort_priority", 302)
+                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
+                isActive = equippedPetName == "Hello Kitty"
+            )
+        }
+    }
 }
 
 @Composable
@@ -318,7 +337,7 @@ private fun CoachRecommendationCard(
     isLoading: Boolean,
     characters: List<CharacterInfo>
 ) {
-    val character = characters.firstOrNull { it.name == recommendation.characterName } ?: characters.first()
+    val character = characters.find { it.name == recommendation.characterName } ?: characters.first()
     val cardColor = characterLightColor(character.color)
     val accentColor = characterAccentColor(character.color)
 
@@ -420,7 +439,6 @@ fun CharacterCard(
 ) {
     val cardColor = characterLightColor(character.color)
     val accentColor = characterAccentColor(character.color)
-    val progress = (character.xp / character.maxXp.toFloat()).coerceIn(0f, 1f)
 
     Card(
         modifier = Modifier
@@ -463,37 +481,13 @@ fun CharacterCard(
                     color = if (character.isActive) accentColor else cardColor
                 ) {
                     Text(
-                        text = if (character.isActive) "Activo" else "Nivel ${character.level}",
+                        text = if (character.isActive) "Equipado" else "Nivel ${character.level}",
                         fontSize = 11.sp,
                         color = if (character.isActive) White else accentColor,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = character.description,
-                fontSize = 14.sp,
-                color = TextPrimary,
-                lineHeight = 20.sp
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = cardColor
-            ) {
-                Text(
-                    text = character.trigger,
-                    fontSize = 12.sp,
-                    color = accentColor,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -506,7 +500,9 @@ fun CharacterCard(
 @Composable
 private fun CharacterDetailScreen(
     character: CharacterInfo,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEquip: () -> Unit,
+    onMissionClick: (String) -> Unit
 ) {
     val cardColor = characterLightColor(character.color)
     val accentColor = characterAccentColor(character.color)
@@ -536,13 +532,7 @@ private fun CharacterDetailScreen(
                 fontWeight = FontWeight.Bold,
                 color = accentColor
             )
-            Text(
-                text = character.role,
-                fontSize = 14.sp,
-                color = TextSecondary,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
+            
             Spacer(modifier = Modifier.height(18.dp))
 
             CharacterImage(
@@ -551,9 +541,34 @@ private fun CharacterDetailScreen(
                 backgroundColorName = character.color,
                 size = 170
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (!character.isActive) {
+                Button(
+                    onClick = onEquip,
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Equipar mascota", fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = White.copy(alpha = 0.5f)
+                ) {
+                    Text(
+                        "Equipada actualmente",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -578,7 +593,7 @@ private fun CharacterDetailScreen(
         Spacer(modifier = Modifier.height(22.dp))
 
         Text(
-            text = "Para mejorar:",
+            text = "Misiones diarias:",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary
@@ -589,23 +604,10 @@ private fun CharacterDetailScreen(
         character.tips.forEach { tip ->
             TipCard(
                 tip = tip,
-                colorName = character.color
+                colorName = character.color,
+                onClick = { if (!tip.isCompleted) onMissionClick(tip.action) }
             )
             Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = White.copy(alpha = 0.72f)
-        ) {
-            Text(
-                text = "Pequenos avances todos los dias tambien suben tus niveles.",
-                fontSize = 14.sp,
-                color = TextPrimary,
-                lineHeight = 20.sp,
-                modifier = Modifier.padding(18.dp)
-            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -651,7 +653,7 @@ private fun CharacterProgress(character: CharacterInfo) {
     Spacer(modifier = Modifier.height(8.dp))
 
     Text(
-        text = if (remainingXp == 0) "Nivel maximo alcanzado" else "Faltan $remainingXp XP para completar esta barra",
+        text = if (remainingXp == 0) "Nivel maximo alcanzado" else "Faltan $remainingXp XP para subir de nivel",
         fontSize = 12.sp,
         color = TextSecondary
     )
@@ -660,15 +662,20 @@ private fun CharacterProgress(character: CharacterInfo) {
 @Composable
 private fun TipCard(
     tip: CharacterTip,
-    colorName: String
+    colorName: String,
+    onClick: () -> Unit
 ) {
     val cardColor = characterLightColor(colorName)
     val accentColor = characterAccentColor(colorName)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !tip.isCompleted, onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = White),
+        colors = CardDefaults.cardColors(
+            containerColor = if (tip.isCompleted) White.copy(alpha = 0.6f) else White
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
@@ -680,13 +687,16 @@ private fun TipCard(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(cardColor, RoundedCornerShape(14.dp)),
+                    .background(
+                        if (tip.isCompleted) TealPrimary.copy(alpha = 0.2f) else cardColor, 
+                        RoundedCornerShape(14.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "+${tip.points}",
-                    color = accentColor,
-                    fontSize = 14.sp,
+                    text = if (tip.isCompleted) "✓" else "+${tip.points}",
+                    color = if (tip.isCompleted) TealPrimary else accentColor,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -698,10 +708,10 @@ private fun TipCard(
                     text = tip.title,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = if (tip.isCompleted) TextSecondary else TextPrimary
                 )
                 Text(
-                    text = tip.description,
+                    text = if (tip.isCompleted) "¡Mision cumplida por hoy!" else tip.description,
                     fontSize = 12.sp,
                     color = TextSecondary,
                     lineHeight = 17.sp,
@@ -709,11 +719,13 @@ private fun TipCard(
                 )
             }
 
-            Text(
-                text = ">",
-                fontSize = 22.sp,
-                color = TextSecondary
-            )
+            if (!tip.isCompleted) {
+                Text(
+                    text = ">",
+                    fontSize = 22.sp,
+                    color = TextSecondary
+                )
+            }
         }
     }
 }

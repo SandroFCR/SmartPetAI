@@ -46,7 +46,11 @@ import java.util.Calendar
 data class DayStats(
     val day: String,
     val minutes: Int,
-    val completedSessions: Int = 0
+    val completedSessions: Int = 0,
+    val createdTasks: Int = 0,
+    val completedTasks: Int = 0,
+    val breaks: Int = 0,
+    val completedMissions: List<Int> = emptyList()
 )
 
 @Composable
@@ -404,7 +408,7 @@ private fun emptyWeekStats(): List<DayStats> {
     )
 }
 
-private fun currentDayLabel(): String {
+fun currentDayLabel(): String {
     return when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
         Calendar.MONDAY -> "Lun"
         Calendar.TUESDAY -> "Mar"

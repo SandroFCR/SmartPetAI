@@ -64,6 +64,7 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(
     totalStudyMinutes: Int = 0,
     completedTasks: Int = 0,
+    onProfileChanged: (String) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     var profile by remember { mutableStateOf(UserProfile(name = "Cargando...")) }
@@ -204,11 +205,11 @@ fun ProfileScreen(
                 )
                 Button(
                     onClick = {
-                        val updatedProfile = profile.copy(
-                            name = tempName.trim().ifEmpty { "Estudiante" }
-                        )
+                        val newName = tempName.trim().ifEmpty { "Estudiante" }
+                        val updatedProfile = profile.copy(name = newName)
                         profile = updatedProfile
                         editingName = false
+                        onProfileChanged(newName)
                         scope.launch {
                             FirebaseManager.saveProfile(updatedProfile)
                         }

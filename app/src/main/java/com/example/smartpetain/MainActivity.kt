@@ -1,5 +1,6 @@
 package com.example.smartpetain
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -123,21 +124,46 @@ fun AppNavigator(
     var pomodoroDuration by remember { mutableStateOf(25) }
     var userName by remember { mutableStateOf("Estudiante") }
 
-    LaunchedEffect(Unit) {
+    // Gamificación y Mascotas
+    var equippedPet by remember { mutableStateOf("Cinnamoroll") }
+    var petStatsList by remember { mutableStateOf<List<PetStats>>(emptyList()) }
+    var tasksList by remember { mutableStateOf<List<Task>>(emptyList()) }
+    var todayCompletedMissions by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var refreshTrigger by remember { mutableStateOf(0) }
+
+    // Flags de navegación por misiones
+    var startSessionAsBreak by remember { mutableStateOf(false) }
+    var initialTasksAddOpen by remember { mutableStateOf(false) }
+    var initialTasksSortBy by remember { mutableStateOf("") }
+
+    // Carga inicial y persistente
+    LaunchedEffect(Unit, refreshTrigger) {
         val profile = FirebaseManager.loadProfile()
-        val tasks = FirebaseManager.loadTasks()
         userName = profile.name.ifBlank { "Estudiante" }
         pomodoroDuration = profile.pomodoroDuration
+        equippedPet = profile.equippedPet
+        
+        tasksList = FirebaseManager.loadTasks()
+        pendingTasks = tasksList.count { !it.isCompleted }
+        completedTasks = tasksList.count { it.isCompleted }
+        
+        petStatsList = FirebaseManager.loadPets()
         totalStudyMinutes = FirebaseManager.loadTotalStudyMinutes()
-        pendingTasks = tasks.count { !it.isCompleted }
-        completedTasks = tasks.count { it.isCompleted }
+
+        val weekStats = FirebaseManager.loadWeekStats()
+        val today = currentDayLabel()
+        todayCompletedMissions = weekStats.find { it.day == today }?.completedMissions ?: emptyList()
     }
 
+    val activePetStats = petStatsList.find { it.name == equippedPet } ?: PetStats(equippedPet)
+
     val activeCharacter = CharacterEngine.getCharacter(
+        equippedPetName = equippedPet,
         studyMinutes = totalStudyMinutes,
         minutesSinceBreak = minutesSinceBreak,
         pendingTasks = pendingTasks,
-        completedTasks = completedTasks
+        completedTasks = completedTasks,
+        petLevel = activePetStats.level
     )
 
     val navItems = listOf(
@@ -150,8 +176,12 @@ fun AppNavigator(
 
     if (currentScreen == "session") {
         StudySessionScreen(
-            onBack = { currentScreen = "dashboard" },
+            onBack = { 
+                currentScreen = "dashboard"
+                startSessionAsBreak = false
+            },
             sessionDurationMinutes = pomodoroDuration,
+            startAsBreak = startSessionAsBreak,
             onPomodoroChanged = { duration ->
                 pomodoroDuration = duration
                 scope.launch {
@@ -172,10 +202,14 @@ fun AppNavigator(
                         character = activeCharacter.name,
                         updateDailyStats = false
                     )
+                    refreshTrigger++
                 }
             },
             onBreakTaken = {
                 minutesSinceBreak = 0
+                scope.launch {
+                    FirebaseManager.incrementDailyStat("breaks")
+                }
             }
         )
         return
@@ -201,10 +235,20 @@ fun AppNavigator(
                 )
 
                 "tasks" -> TasksScreen(
+                    tasks = tasksList,
                     onBack = { currentScreen = "dashboard" },
-                    onTasksChanged = { pending, completed ->
-                        pendingTasks = pending
-                        completedTasks = completed
+                    initialOpenAddDialog = initialTasksAddOpen,
+                    initialSortBy = initialTasksSortBy,
+                    onTasksChanged = { newList ->
+                        tasksList = newList
+                        pendingTasks = newList.count { !it.isCompleted }
+                        completedTasks = newList.count { it.isCompleted }
+                        initialTasksAddOpen = false
+                        initialTasksSortBy = ""
+                        // Forzamos refresco de XP si se completó algo
+                        scope.launch {
+                            refreshTrigger++
+                        }
                     }
                 )
 
@@ -216,12 +260,48 @@ fun AppNavigator(
                 "characters" -> CharactersScreen(
                     totalStudyMinutes = totalStudyMinutes,
                     completedTasks = completedTasks,
-                    pendingTasks = pendingTasks
+                    pendingTasks = pendingTasks,
+                    petStatsList = petStatsList,
+                    equippedPetName = equippedPet,
+                    todayCompletedMissions = todayCompletedMissions,
+                    onEquipPet = { petName ->
+                        equippedPet = petName
+                        scope.launch {
+                            FirebaseManager.saveEquippedPet(petName)
+                        }
+                    },
+                    onMissionAction = { action ->
+                        when (action) {
+                            "add_task" -> {
+                                initialTasksAddOpen = true
+                                currentScreen = "tasks"
+                            }
+                            "sort_priority" -> {
+                                initialTasksSortBy = "priority"
+                                currentScreen = "tasks"
+                                scope.launch {
+                                    FirebaseManager.completeDailyMission("Hello Kitty", 302, 10)
+                                    refreshTrigger++
+                                }
+                            }
+                            "take_break" -> {
+                                startSessionAsBreak = true
+                                currentScreen = "session"
+                            }
+                            "start_study" -> {
+                                currentScreen = "session"
+                            }
+                        }
+                    }
                 )
 
                 "profile" -> ProfileScreen(
                     totalStudyMinutes = totalStudyMinutes,
                     completedTasks = completedTasks,
+                    onProfileChanged = { newName -> 
+                        userName = newName 
+                        refreshTrigger++
+                    },
                     onLogout = {
                         currentScreen = "dashboard"
                         onLogout()
@@ -306,6 +386,7 @@ private fun KawaiiBottomBar(
     }
 }
 
+@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun DashboardScreen(
     onStartSession: () -> Unit,

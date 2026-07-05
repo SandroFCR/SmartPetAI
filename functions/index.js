@@ -14,6 +14,7 @@ exports.generateStudyCoach = onCall(
     const dailyGoalMinutes = clampNumber(data.dailyGoalMinutes, 1, 300, 25);
     const completedTasks = clampNumber(data.completedTasks, 0, 999, 0);
     const pendingTasks = clampNumber(data.pendingTasks, 0, 999, 0);
+    const pets = Array.isArray(data.pets) ? data.pets : [];
     const weekStats = normalizeWeekStats(data.weekStats);
 
     const weeklyGoal = dailyGoalMinutes * 7;
@@ -39,6 +40,7 @@ exports.generateStudyCoach = onCall(
       remainingWeeklyMinutes,
       completedTasks,
       pendingTasks,
+      pets,
       weekStats,
       availableCharacters: ["Cinnamoroll", "Pompompurin", "Hello Kitty"],
     };
@@ -56,6 +58,8 @@ exports.generateStudyCoach = onCall(
             "Eres un coach de estudio dentro de una app kawaii de mascotas. " +
             "Responde en espanol claro, breve y motivador. " +
             "No uses markdown. No inventes datos. " +
+            "Recibiras los niveles de las mascotas (pets). Felicita al usuario por niveles altos " +
+            "o motiva a subir de nivel a las mascotas con niveles bajos recomendando acciones. " +
             "Elige solo una mascota entre Cinnamoroll, Pompompurin y Hello Kitty.",
           input:
             "Genera una recomendacion de estudio con estos datos reales: " +
