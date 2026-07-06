@@ -26,6 +26,18 @@ data class StudySessionRecord(
     val timestamp: Long
 )
 
+data class PomodoroStatsSummary(
+    val totalPomodoros: Int = 0,
+    val totalStudyMinutes: Int = 0,
+    val totalBreakMinutes: Int = 0,
+    val todayPomodoros: Int = 0,
+    val weekPomodoros: Int = 0,
+    val monthPomodoros: Int = 0,
+    val bestProductivityStreak: Int = 0,
+    val consecutivePomodoroDays: Int = 0,
+    val averageDailySessions: Double = 0.0
+)
+
 data class PetStats(
     val name: String = "",
     val level: Int = 1,
@@ -192,6 +204,36 @@ object FirebaseManager {
         }
     }
 
+    suspend fun saveBreakMinutes(minutes: Int) {
+        if (minutes <= 0) return
+
+        try {
+            val date = getCurrentDate()
+            val statsRef = db.collection("users")
+                .document(userId)
+                .collection("dailyStats")
+                .document(date)
+
+            db.runTransaction { transaction ->
+                val current = transaction.get(statsRef)
+                val currentBreakMinutes = current.getLong("breakMinutes")?.toInt() ?: 0
+                val currentBreaks = current.getLong("breaks")?.toInt() ?: 0
+                transaction.set(
+                    statsRef,
+                    hashMapOf(
+                        "date" to date,
+                        "breakMinutes" to (currentBreakMinutes + minutes),
+                        "breaks" to (currentBreaks + 1)
+                    ),
+                    SetOptions.merge()
+                )
+            }.await()
+            checkDailyMissions()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     suspend fun checkDailyMissions() {
         try {
             val date = getCurrentDate()
@@ -256,6 +298,7 @@ object FirebaseManager {
                     createdTasks = (doc?.getLong("createdTasks") ?: 0).toInt(),
                     completedTasks = (doc?.getLong("completedTasks") ?: 0).toInt(),
                     breaks = (doc?.getLong("breaks") ?: 0).toInt(),
+                    breakMinutes = (doc?.getLong("breakMinutes") ?: 0).toInt(),
                     completedMissions = (doc?.get("completedMissions") as? List<*>)?.map { it.toString().toInt() } ?: emptyList()
                 )
             }
@@ -279,6 +322,53 @@ object FirebaseManager {
         } catch (e: Exception) {
             e.printStackTrace()
             0
+        }
+    }
+
+    suspend fun loadPomodoroStatsSummary(): PomodoroStatsSummary {
+        return try {
+            val snapshot = db.collection("users")
+                .document(userId)
+                .collection("dailyStats")
+                .get()
+                .await()
+
+            val today = getCurrentDate()
+            val weekDates = getCurrentWeekDates().map { it.second }.toSet()
+            val currentMonthPrefix = today.substring(0, 7)
+            val dailyPomodoros = snapshot.documents.mapNotNull { doc ->
+                val date = doc.getString("date") ?: doc.id
+                if (date.length < 10) return@mapNotNull null
+                DailyPomodoroTotals(
+                    date = date,
+                    studyMinutes = (doc.getLong("minutes") ?: 0).toInt(),
+                    breakMinutes = (doc.getLong("breakMinutes") ?: 0).toInt(),
+                    completedSessions = (doc.getLong("completedSessions") ?: 0).toInt()
+                )
+            }
+
+            val totalPomodoros = dailyPomodoros.sumOf { it.completedSessions }
+            val activeDays = dailyPomodoros.count { it.completedSessions > 0 }
+            PomodoroStatsSummary(
+                totalPomodoros = totalPomodoros,
+                totalStudyMinutes = dailyPomodoros.sumOf { it.studyMinutes },
+                totalBreakMinutes = dailyPomodoros.sumOf { it.breakMinutes },
+                todayPomodoros = dailyPomodoros
+                    .filter { it.date == today }
+                    .sumOf { it.completedSessions },
+                weekPomodoros = dailyPomodoros
+                    .filter { it.date in weekDates }
+                    .sumOf { it.completedSessions },
+                monthPomodoros = dailyPomodoros
+                    .filter { it.date.startsWith(currentMonthPrefix) }
+                    .sumOf { it.completedSessions },
+                bestProductivityStreak = calculateBestStreak(dailyPomodoros),
+                consecutivePomodoroDays = calculateCurrentPomodoroStreak(dailyPomodoros, today),
+                averageDailySessions = if (activeDays > 0) totalPomodoros.toDouble() / activeDays else 0.0
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            PomodoroStatsSummary()
         }
     }
 
@@ -563,5 +653,63 @@ object FirebaseManager {
             cal.get(Calendar.MONTH) + 1,
             cal.get(Calendar.DAY_OF_MONTH)
         )
+    }
+
+    private data class DailyPomodoroTotals(
+        val date: String,
+        val studyMinutes: Int,
+        val breakMinutes: Int,
+        val completedSessions: Int
+    )
+
+    private fun calculateBestStreak(days: List<DailyPomodoroTotals>): Int {
+        var best = 0
+        var current = 0
+        var previousActiveDate: String? = null
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+        days.sortedBy { it.date }.filter { it.completedSessions > 0 }.forEach { day ->
+            val previous = previousActiveDate
+            if (day.completedSessions > 0) {
+                current = if (previous == null || isNextDay(previous, day.date, formatter)) {
+                    current + 1
+                } else {
+                    1
+                }
+                previousActiveDate = day.date
+                best = maxOf(best, current)
+            } else {
+                current = 0
+            }
+        }
+
+        return best
+    }
+
+    private fun isNextDay(previousDate: String, currentDate: String, formatter: SimpleDateFormat): Boolean {
+        val previous = formatter.parse(previousDate) ?: return false
+        val current = formatter.parse(currentDate) ?: return false
+        val cal = Calendar.getInstance()
+        cal.time = previous
+        cal.add(Calendar.DAY_OF_MONTH, 1)
+        return formatter.format(cal.time) == formatter.format(current)
+    }
+
+    private fun calculateCurrentPomodoroStreak(days: List<DailyPomodoroTotals>, today: String): Int {
+        val pomodoroDates = days
+            .filter { it.completedSessions > 0 }
+            .map { it.date }
+            .toSet()
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val cal = Calendar.getInstance()
+        cal.time = formatter.parse(today) ?: return 0
+
+        var streak = 0
+        while (pomodoroDates.contains(formatter.format(cal.time))) {
+            streak++
+            cal.add(Calendar.DAY_OF_MONTH, -1)
+        }
+
+        return streak
     }
 }

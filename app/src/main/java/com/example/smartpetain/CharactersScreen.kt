@@ -312,7 +312,7 @@ private fun buildCharactersFromStats(
             )
             else -> CharacterInfo(
                 name = "Hello Kitty",
-                imageSource = ImageSource.Remote("https://static.wikia.nocookie.net/hellokitty/images/5/52/Sanrio_Characters_Hello_Kitty_Image026.png/revision/latest?cb=20250110105831"),
+                imageSource = ImageSource.Local(R.drawable.hello_kitty),
                 role = "Organizacion",
                 description = "Sube cuando organizas tus pendientes.",
                 trigger = "Aparece con 3+ tareas pendientes",

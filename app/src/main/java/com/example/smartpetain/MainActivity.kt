@@ -205,10 +205,11 @@ fun AppNavigator(
                     refreshTrigger++
                 }
             },
-            onBreakTaken = {
+            onBreakFinished = { minutes ->
                 minutesSinceBreak = 0
                 scope.launch {
-                    FirebaseManager.incrementDailyStat("breaks")
+                    FirebaseManager.saveBreakMinutes(minutes)
+                    refreshTrigger++
                 }
             }
         )

@@ -62,7 +62,7 @@ fun StudySessionScreen(
     onPomodoroChanged: (Int) -> Unit = {},
     onMinuteStudied: (Int) -> Unit = {},
     onSessionFinished: (Int) -> Unit = {},
-    onBreakTaken: () -> Unit = {}
+    onBreakFinished: (Int) -> Unit = {}
 ) {
     val breakDurationSeconds = 5 * 60
     val studyDurationSeconds = sessionDurationMinutes * 60
@@ -122,9 +122,9 @@ fun StudySessionScreen(
                     timeLeft = breakDurationSeconds
                     sessionTime = 0
                     lastMinuteReported = 0
-                    onBreakTaken()
                 } else {
                     SmartPetNotificationManager.sendStudyNotification(context)
+                    onBreakFinished(breakDurationSeconds / 60)
                     phase = PomodoroPhase.STUDY
                     timeLeft = studyDurationSeconds
                     isRunning = false
@@ -272,7 +272,6 @@ fun StudySessionScreen(
                     timeLeft = studyDurationSeconds
                     sessionTime = 0
                     lastMinuteReported = 0
-                    onBreakTaken()
                 },
                 modifier = Modifier
                     .weight(1f)
