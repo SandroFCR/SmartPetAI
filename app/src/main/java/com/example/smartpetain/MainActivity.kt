@@ -233,7 +233,8 @@ fun AppNavigator(
                     activeCharacter = activeCharacter,
                     totalStudyMinutes = totalStudyMinutes,
                     pendingTasks = pendingTasks,
-                    userName = userName
+                    userName = userName,
+                    equippedPet = equippedPet
                 )
 
                 "tasks" -> TasksScreen(
@@ -251,7 +252,8 @@ fun AppNavigator(
                         scope.launch {
                             refreshTrigger++
                         }
-                    }
+                    },
+                    equippedPet = equippedPet
                 )
 
                 "stats" -> StatsScreen(
@@ -395,7 +397,8 @@ fun DashboardScreen(
     activeCharacter: Character,
     totalStudyMinutes: Int,
     pendingTasks: Int,
-    userName: String
+    userName: String,
+    equippedPet: String
 ) {
     val hours = totalStudyMinutes / 60
     val minutes = totalStudyMinutes % 60
@@ -426,7 +429,7 @@ fun DashboardScreen(
         ) {
             GreetingHeader(userName = userName, compact = compact)
             Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
-            MascotHero(compact = compact)
+            MascotHero(compact = compact, equippedPet = equippedPet)
             Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
             MotivationCard(message = activeCharacter.message, compact = compact)
             Spacer(modifier = Modifier.height(if (compact) 6.dp else 10.dp))
@@ -509,10 +512,16 @@ private fun GreetingHeader(userName: String, compact: Boolean) {
 }
 
 @Composable
-private fun MascotHero(compact: Boolean) {
+private fun MascotHero(compact: Boolean, equippedPet: String) {
     val heroHeight = if (compact) 180.dp else 210.dp
     val circleSize = if (compact) 150.dp else 176.dp
     val imageHeight = if (compact) 170.dp else 198.dp
+
+    val petImage = when (equippedPet) {
+        "Pompompurin" -> R.drawable.pompompurin
+        "Hello Kitty" -> R.drawable.hello_kitty
+        else -> R.drawable.cinnamoroll
+    }
 
     Box(
         modifier = Modifier
@@ -580,8 +589,8 @@ private fun MascotHero(compact: Boolean) {
                 .padding(start = 68.dp, bottom = if (compact) 48.dp else 62.dp)
         )
         Image(
-            painter = painterResource(id = R.drawable.cinnamoroll),
-            contentDescription = "Cinnamoroll",
+            painter = painterResource(id = petImage),
+            contentDescription = equippedPet,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth(0.9f)

@@ -1,5 +1,6 @@
 package com.example.smartpetain
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -94,8 +95,10 @@ fun TasksScreen(
     onBack: () -> Unit,
     initialOpenAddDialog: Boolean = false,
     initialSortBy: String = "",
-    onTasksChanged: (List<Task>) -> Unit = {}
+    onTasksChanged: (List<Task>) -> Unit = {},
+    equippedPet: String = "Cinnamoroll"
 ) {
+    val isDark = isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
     var showDialog by remember { mutableStateOf(initialOpenAddDialog) }
     var sortBy by remember { mutableStateOf(initialSortBy.ifBlank { "none" }) }
@@ -168,7 +171,11 @@ fun TasksScreen(
                     .offset(y = 10.dp)
             )
             Image(
-                painter = painterResource(id = R.drawable.pompompurin),
+                painter = painterResource(id = when(equippedPet) {
+                    "Pompompurin" -> R.drawable.pompompurin
+                    "Hello Kitty" -> R.drawable.hello_kitty
+                    else -> R.drawable.cinnamoroll
+                }),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
