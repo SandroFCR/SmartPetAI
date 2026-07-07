@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -331,7 +332,7 @@ private fun KawaiiBottomBar(
                 .height(72.dp)
                 .shadow(12.dp, RoundedCornerShape(24.dp), clip = false),
             shape = RoundedCornerShape(24.dp),
-            color = White.copy(alpha = 0.98f)
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
         ) {
             Row(
                 modifier = Modifier
@@ -361,7 +362,7 @@ private fun KawaiiBottomBar(
                             Icon(
                                 imageVector = item.icon,
                                 contentDescription = item.label,
-                                tint = if (isSelected) DashboardBluePrimary else TextSecondary.copy(alpha = 0.78f),
+                                tint = if (isSelected) DashboardBluePrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 modifier = Modifier.size(if (isSelected) 22.dp else 19.dp)
                             )
                         }
@@ -369,7 +370,7 @@ private fun KawaiiBottomBar(
                             text = item.label,
                             fontSize = 9.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                            color = if (isSelected) DashboardBluePrimary else TextSecondary.copy(alpha = 0.9f),
+                            color = if (isSelected) DashboardBluePrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -420,15 +421,15 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = horizontalPadding),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(if (compact) 18.dp else 24.dp))
             GreetingHeader(userName = userName, compact = compact)
-            Spacer(modifier = Modifier.height(if (compact) 6.dp else 8.dp))
+            Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
             MascotHero(compact = compact)
-            Spacer(modifier = Modifier.height(if (compact) 6.dp else 8.dp))
+            Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
             MotivationCard(message = activeCharacter.message, compact = compact)
-            Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
+            Spacer(modifier = Modifier.height(if (compact) 6.dp else 10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp)
@@ -454,9 +455,8 @@ fun DashboardScreen(
                     compact = compact
                 )
             }
-            Spacer(modifier = Modifier.height(if (compact) 10.dp else 14.dp))
+            Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
             StartStudyButton(onStartSession = onStartSession, compact = compact)
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
@@ -639,7 +639,7 @@ private fun MotivationCard(message: String, compact: Boolean) {
             .height(if (compact) 62.dp else 72.dp)
             .shadow(9.dp, RoundedCornerShape(22.dp), clip = false),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = White.copy(alpha = 0.94f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
@@ -683,7 +683,7 @@ private fun MotivationCard(message: String, compact: Boolean) {
                     text = shortMotivation(message),
                     fontSize = if (compact) 11.sp else 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DashboardBluePrimary.copy(alpha = 0.78f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp)
@@ -709,7 +709,7 @@ private fun DashboardMetricCard(
             .height(if (compact) 120.dp else 136.dp)
             .shadow(9.dp, RoundedCornerShape(22.dp), clip = false),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = White.copy(alpha = 0.94f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -746,7 +746,7 @@ private fun DashboardMetricCard(
                     text = label,
                     fontSize = if (compact) 10.sp else 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextSecondary.copy(alpha = 0.82f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f),
                     textAlign = TextAlign.Center,
                     lineHeight = if (compact) 12.sp else 14.sp,
                     maxLines = 2,

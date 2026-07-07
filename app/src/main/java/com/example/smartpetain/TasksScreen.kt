@@ -2,6 +2,7 @@ package com.example.smartpetain
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,9 +38,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -354,6 +359,11 @@ fun TasksScreen(
             initialSelectedDateMillis = calendar.timeInMillis
         )
         var showDatePicker by remember { mutableStateOf(false) }
+        var showTimePicker by remember { mutableStateOf(false) }
+        val timePickerState = rememberTimePickerState(
+            initialHour = calendar.get(Calendar.HOUR_OF_DAY),
+            initialMinute = calendar.get(Calendar.MINUTE)
+        )
 
         val selectedDateText = datePickerState.selectedDateMillis?.let { millis ->
             val cal = Calendar.getInstance()
@@ -363,28 +373,25 @@ fun TasksScreen(
                 cal.get(Calendar.MONTH) + 1,
                 cal.get(Calendar.DAY_OF_MONTH)
             )
-        } ?: "Sin fecha"
+        } ?: ""
+
+        val selectedTimeText = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
+        val combinedDateTimeText = if (selectedDateText.isNotBlank()) "$selectedDateText $selectedTimeText" else "Sin fecha"
 
         AlertDialog(
             onDismissRequest = { showDialog = false },
             shape = RoundedCornerShape(28.dp),
             containerColor = TaskDialogBackground,
             title = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(shape = RoundedCornerShape(50.dp), color = TaskButtonYellow) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = null,
-                            tint = TaskBrown,
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = "Nueva tarea",
                         fontWeight = FontWeight.Bold,
                         color = TaskBrown,
-                        fontSize = 24.sp
+                        fontSize = 26.sp
                     )
                 }
             },
@@ -414,13 +421,18 @@ fun TasksScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = selectedDateText,
+                        value = combinedDateTimeText,
                         onValueChange = { },
-                        label = { Text("Fecha") },
+                        label = { Text("Fecha y Hora") },
                         readOnly = true,
                         trailingIcon = {
-                            TextButton(onClick = { showDatePicker = true }) {
-                                Text("Elegir", fontSize = 12.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { showDatePicker = true }) {
+                                    Text("Fecha", fontSize = 12.sp)
+                                }
+                                TextButton(onClick = { showTimePicker = true }) {
+                                    Text("Hora", fontSize = 12.sp)
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -475,7 +487,7 @@ fun TasksScreen(
                                 subject = newTaskSubject.trim().ifBlank { "General" },
                                 priority = selectedPriority,
                                 emoji = newTaskEmoji.trim().ifBlank { defaultTaskEmoji(selectedPriority) },
-                                dueDate = selectedDateText
+                                dueDate = combinedDateTimeText
                             )
                             val updatedTasks = tasks + newTask
                             onTasksChanged(updatedTasks)
@@ -521,6 +533,34 @@ fun TasksScreen(
             ) {
                 DatePicker(state = datePickerState)
             }
+        }
+
+        if (showTimePicker) {
+            AlertDialog(
+                onDismissRequest = { showTimePicker = false },
+                confirmButton = {
+                    Button(
+                        onClick = { showTimePicker = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
+                    ) {
+                        Text("Confirmar", color = TaskBrown)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTimePicker = false }) {
+                        Text("Cancelar", color = TextSecondary)
+                    }
+                },
+                containerColor = TaskDialogBackground,
+                text = {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        TimePicker(state = timePickerState)
+                    }
+                }
+            )
         }
     }
 }

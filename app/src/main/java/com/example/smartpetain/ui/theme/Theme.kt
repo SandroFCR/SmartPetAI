@@ -3,7 +3,6 @@ package com.example.smartpetain.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
 private val LightColorScheme = lightColorScheme(
@@ -11,24 +10,18 @@ private val LightColorScheme = lightColorScheme(
     secondary = TealPrimary,
     tertiary = PinkPrimary,
     background = Background,
-    surface = White
-)
-
-private val DarkColorScheme = darkColorScheme(
-    primary = PurplePrimary,
-    secondary = TealPrimary,
-    tertiary = PinkPrimary
+    surface = White,
+    onBackground = TextPrimary,
+    onSurface = TextPrimary
 )
 
 @Composable
 fun SmartPetAInTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Forzado a falso para eliminar modo oscuro
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = LightColorScheme,
         typography = Typography,
         content = content
     )

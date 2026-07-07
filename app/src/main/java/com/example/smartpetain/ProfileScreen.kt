@@ -33,9 +33,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,7 +70,6 @@ fun ProfileScreen(
     var editingName by remember { mutableStateOf(false) }
     var tempName by remember { mutableStateOf("") }
     var localAvatarUri by remember { mutableStateOf<Uri?>(null) }
-    var darkMode by remember { mutableStateOf(false) }
     var isUploadingAvatar by remember { mutableStateOf(false) }
     var avatarMessage by remember { mutableStateOf<String?>(null) }
 
@@ -322,28 +320,6 @@ fun ProfileScreen(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = PurplePrimary
-                    )
-                }
-
-                HorizontalDivider(
-                    color = PurpleLight,
-                    thickness = 0.5.dp,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Modo oscuro", fontSize = 15.sp, color = TextPrimary)
-                    Switch(
-                        checked = darkMode,
-                        onCheckedChange = { darkMode = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = PurplePrimary,
-                            checkedTrackColor = PurpleLight
-                        )
                     )
                 }
             }
