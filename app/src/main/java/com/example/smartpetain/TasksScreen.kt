@@ -1,9 +1,9 @@
 package com.example.smartpetain
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,13 +42,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.TimePickerDefaults
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,16 +63,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartpetain.ui.theme.AmberLight
 import com.example.smartpetain.ui.theme.AmberPrimary
-import com.example.smartpetain.ui.theme.Background
 import com.example.smartpetain.ui.theme.PinkLight
 import com.example.smartpetain.ui.theme.PinkPrimary
 import com.example.smartpetain.ui.theme.PurpleLight
 import com.example.smartpetain.ui.theme.PurplePrimary
 import com.example.smartpetain.ui.theme.TealLight
 import com.example.smartpetain.ui.theme.TealPrimary
-import com.example.smartpetain.ui.theme.TextPrimary
 import com.example.smartpetain.ui.theme.TextSecondary
 import com.example.smartpetain.ui.theme.White
+import com.example.smartpetain.ui.theme.DashboardBlueBackground
+import com.example.smartpetain.ui.theme.DashboardBluePrimary
 import java.util.Calendar
 import kotlinx.coroutines.launch
 
@@ -100,6 +98,31 @@ fun TasksScreen(
 ) {
     val isDark = isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
+
+    val petThemeColor = when (equippedPet) {
+        "Pompompurin" -> Color(0xFFFFF4C5)
+        "Hello Kitty" -> Color(0xFFFCE4EC)
+        else -> DashboardBlueBackground
+    }
+
+    val petAccentColor = when (equippedPet) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> DashboardBluePrimary
+    }
+
+    val petTextColor = when (equippedPet) {
+        "Pompompurin" -> Color(0xFF5A1C05)
+        "Hello Kitty" -> Color(0xFF5A1C30)
+        else -> Color(0xFF052A5A)
+    }
+
+    val petButtonColor = when (equippedPet) {
+        "Pompompurin" -> Color(0xFFFFC400)
+        "Hello Kitty" -> Color(0xFFE95F95)
+        else -> DashboardBluePrimary
+    }
+
     var showDialog by remember { mutableStateOf(initialOpenAddDialog) }
     var sortBy by remember { mutableStateOf(initialSortBy.ifBlank { "none" }) }
     var selectedTab by remember { mutableStateOf("pending") }
@@ -123,7 +146,7 @@ fun TasksScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(TaskWarmBackground)
+            .background(if (isDark) MaterialTheme.colorScheme.background else petThemeColor)
             .padding(20.dp)
     ) {
         Spacer(modifier = Modifier.height(18.dp))
@@ -136,14 +159,14 @@ fun TasksScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Volver",
-                    tint = TextPrimary
+                    tint = if (isDark) MaterialTheme.colorScheme.onBackground else petTextColor
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
             Icon(
                 imageVector = Icons.Filled.MoreHoriz,
                 contentDescription = null,
-                tint = TextPrimary
+                tint = if (isDark) MaterialTheme.colorScheme.onBackground else petTextColor
             )
         }
 
@@ -151,7 +174,7 @@ fun TasksScreen(
             text = "    Mis tareas  ",
             fontSize = 46.sp,
             fontWeight = FontWeight.Bold,
-            color = TaskBrown,
+            color = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
             modifier = Modifier.padding(start = 8.dp)
         )
 
@@ -165,7 +188,7 @@ fun TasksScreen(
             Icon(
                 imageVector = Icons.Filled.StarBorder,
                 contentDescription = null,
-                tint = TaskGold.copy(alpha = 0.55f),
+                tint = petAccentColor.copy(alpha = 0.55f),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .offset(y = 10.dp)
@@ -188,20 +211,20 @@ fun TasksScreen(
                     .fillMaxWidth()
                     .padding(start = 142.dp, top = 34.dp),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = White),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         text = "Organicemos tu dia!",
                         fontSize = 16.sp,
-                        color = TaskBrown,
+                        color = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Tu puedes con todo.",
                         fontSize = 15.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
@@ -209,7 +232,7 @@ fun TasksScreen(
             Icon(
                 imageVector = Icons.Filled.StarBorder,
                 contentDescription = null,
-                tint = TaskGold.copy(alpha = 0.5f),
+                tint = petAccentColor.copy(alpha = 0.5f),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .offset(y = 8.dp)
@@ -222,7 +245,7 @@ fun TasksScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = White),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Row(
@@ -236,14 +259,18 @@ fun TasksScreen(
                     count = pendingCount,
                     selected = selectedTab == "pending",
                     modifier = Modifier.weight(1f),
-                    onClick = { selectedTab = "pending" }
+                    onClick = { selectedTab = "pending" },
+                    petThemeColor = petThemeColor,
+                    petTextColor = petTextColor
                 )
                 TaskTabChip(
                     text = "Completadas",
                     count = completedCount,
                     selected = selectedTab == "completed",
                     modifier = Modifier.weight(1f),
-                    onClick = { selectedTab = "completed" }
+                    onClick = { selectedTab = "completed" },
+                    petThemeColor = petThemeColor,
+                    petTextColor = petTextColor
                 )
             }
         }
@@ -263,12 +290,12 @@ fun TasksScreen(
                 Surface(
                     onClick = { sortBy = key },
                     shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) TaskGold else White
+                    color = if (isSelected) (if (isDark) MaterialTheme.colorScheme.primary else petAccentColor) else MaterialTheme.colorScheme.surface
                 ) {
                     Text(
                         text = label,
                         fontSize = 12.sp,
-                        color = if (isSelected) White else TaskGold,
+                        color = if (isSelected) White else (if (isDark) MaterialTheme.colorScheme.onSurface else petAccentColor),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                     )
@@ -339,13 +366,13 @@ fun TasksScreen(
                 .fillMaxWidth()
                 .height(64.dp),
             shape = RoundedCornerShape(32.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
+            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
         ) {
-            Surface(shape = RoundedCornerShape(50.dp), color = White) {
+            Surface(shape = RoundedCornerShape(50.dp), color = if (isDark) MaterialTheme.colorScheme.surface else White) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = null,
-                    tint = TaskBrown,
+                    tint = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
                     modifier = Modifier.padding(8.dp)
                 )
             }
@@ -353,7 +380,7 @@ fun TasksScreen(
             Text(
                 text = "Agregar tarea",
                 fontSize = 22.sp,
-                color = TaskBrown,
+                color = if (isDark) White else petTextColor,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -388,7 +415,7 @@ fun TasksScreen(
         AlertDialog(
             onDismissRequest = { showDialog = false },
             shape = RoundedCornerShape(28.dp),
-            containerColor = TaskDialogBackground,
+            containerColor = if (isDark) MaterialTheme.colorScheme.surface else Color(0xFFFFFBEE),
             title = {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -397,7 +424,7 @@ fun TasksScreen(
                     Text(
                         text = "Nueva tarea",
                         fontWeight = FontWeight.Bold,
-                        color = TaskBrown,
+                        color = if (isDark) MaterialTheme.colorScheme.onSurface else petTextColor,
                         fontSize = 26.sp
                     )
                 }
@@ -509,9 +536,9 @@ fun TasksScreen(
                         }
                     },
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
                 ) {
-                    Text("Agregar", color = TaskBrown, fontWeight = FontWeight.Bold)
+                    Text("Agregar", color = if (isDark) White else petTextColor, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -527,9 +554,9 @@ fun TasksScreen(
                 confirmButton = {
                     Button(
                         onClick = { showDatePicker = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
                     ) {
-                        Text("Confirmar", color = TaskBrown)
+                        Text("Confirmar", color = if (isDark) White else petTextColor)
                     }
                 },
                 dismissButton = {
@@ -548,9 +575,9 @@ fun TasksScreen(
                 confirmButton = {
                     Button(
                         onClick = { showTimePicker = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = TaskButtonYellow)
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
                     ) {
-                        Text("Confirmar", color = TaskBrown)
+                        Text("Confirmar", color = if (isDark) White else petTextColor)
                     }
                 },
                 dismissButton = {
@@ -558,7 +585,7 @@ fun TasksScreen(
                         Text("Cancelar", color = TextSecondary)
                     }
                 },
-                containerColor = TaskDialogBackground,
+                containerColor = if (isDark) MaterialTheme.colorScheme.surface else Color(0xFFFFFBEE),
                 text = {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -578,13 +605,16 @@ private fun TaskTabChip(
     count: Int,
     selected: Boolean,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    petThemeColor: Color,
+    petTextColor: Color
 ) {
+    val isDark = isSystemInDarkTheme()
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) TaskTabSelected else Color.Transparent
+        color = if (selected) (if (isDark) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else petThemeColor.copy(alpha = 0.8f)) else Color.Transparent
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -594,7 +624,7 @@ private fun TaskTabChip(
             Text(
                 text = if (text == "Pendientes") "📋 $text" else "✓ $text",
                 fontSize = 15.sp,
-                color = if (selected) TaskBrown else TextSecondary,
+                color = if (selected) (if (isDark) MaterialTheme.colorScheme.primary else petTextColor) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.width(6.dp))
@@ -616,6 +646,7 @@ private fun TaskTabChip(
 
 @Composable
 fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
+    val isDark = isSystemInDarkTheme()
     val priorityColor = when (task.priority) {
         "Alta" -> PinkPrimary
         "Media" -> AmberPrimary
@@ -631,7 +662,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) TaskCompletedBackground else White
+            containerColor = if (task.isCompleted) (if (isDark) Color(0xFF1B2B1B) else Color(0xFFF5FFF0)) else MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -646,7 +677,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                 onCheckedChange = { onToggle(task) },
                 colors = CheckboxDefaults.colors(
                     checkedColor = TealPrimary,
-                    uncheckedColor = Color(0xFFD9D3C7)
+                    uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                 )
             )
             Column(
@@ -658,13 +689,13 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                     text = task.name,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (task.isCompleted) TealPrimary else TextPrimary,
+                    color = if (task.isCompleted) TealPrimary else MaterialTheme.colorScheme.onSurface,
                     textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = task.subject, fontSize = 12.sp, color = TextSecondary)
-                    Surface(shape = RoundedCornerShape(10.dp), color = priorityBg) {
+                    Text(text = task.subject, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Surface(shape = RoundedCornerShape(10.dp), color = if (isDark) priorityBg.copy(alpha = 0.2f) else priorityBg) {
                         Text(
                             text = task.priority,
                             fontSize = 11.sp,
@@ -678,14 +709,14 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                     Text(
                         text = task.dueDate,
                         fontSize = 11.sp,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
             Surface(
                 shape = RoundedCornerShape(18.dp),
-                color = priorityBg,
+                color = if (isDark) priorityBg.copy(alpha = 0.2f) else priorityBg,
                 modifier = Modifier.size(58.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -703,7 +734,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                 Icon(
                     imageVector = Icons.Filled.DeleteOutline,
                     contentDescription = "Eliminar",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
         }
@@ -717,11 +748,3 @@ private fun defaultTaskEmoji(priority: String): String {
         else -> "📒"
     }
 }
-
-private val TaskWarmBackground = Color(0xFFFFF4C5)
-private val TaskGold = Color(0xFFE8A900)
-private val TaskBrown = Color(0xFF5A1C05)
-private val TaskButtonYellow = Color(0xFFFFC400)
-private val TaskTabSelected = Color(0xFFFFF0B5)
-private val TaskDialogBackground = Color(0xFFFFFBEE)
-private val TaskCompletedBackground = Color(0xFFF5FFF0)

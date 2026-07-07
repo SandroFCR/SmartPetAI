@@ -404,18 +404,22 @@ fun DashboardScreen(
     val minutes = totalStudyMinutes % 60
     val studiedText = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 
+    val petThemeColors = when (equippedPet) {
+        "Pompompurin" -> listOf(Color(0xFFFFF9C4), Color(0xFFFFF59D), White.copy(alpha = 0.92f))
+        "Hello Kitty" -> listOf(Color(0xFFFCE4EC), Color(0xFFF8BBD0), White.copy(alpha = 0.92f))
+        else -> listOf(DashboardBlueBackground, DashboardBlueLight, White.copy(alpha = 0.92f))
+    }
+
+    val petAccentColor = when (equippedPet) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> DashboardBluePrimary
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        DashboardBlueBackground,
-                        DashboardBlueLight,
-                        White.copy(alpha = 0.92f)
-                    )
-                )
-            )
+            .background(Brush.verticalGradient(colors = petThemeColors))
     ) {
         val compact = maxHeight < 620.dp
         val horizontalPadding = if (compact) 20.dp else 24.dp
@@ -427,11 +431,11 @@ fun DashboardScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            GreetingHeader(userName = userName, compact = compact)
+            GreetingHeader(userName = userName, compact = compact, accentColor = petAccentColor)
             Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
             MascotHero(compact = compact, equippedPet = equippedPet)
             Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
-            MotivationCard(message = activeCharacter.message, compact = compact)
+            MotivationCard(message = activeCharacter.message, compact = compact, accentColor = petAccentColor)
             Spacer(modifier = Modifier.height(if (compact) 6.dp else 10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -459,13 +463,13 @@ fun DashboardScreen(
                 )
             }
             Spacer(modifier = Modifier.height(if (compact) 8.dp else 12.dp))
-            StartStudyButton(onStartSession = onStartSession, compact = compact)
+            StartStudyButton(onStartSession = onStartSession, compact = compact, accentColor = petAccentColor)
         }
     }
 }
 
 @Composable
-private fun GreetingHeader(userName: String, compact: Boolean) {
+private fun GreetingHeader(userName: String, compact: Boolean, accentColor: Color) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -479,7 +483,7 @@ private fun GreetingHeader(userName: String, compact: Boolean) {
                 fontSize = if (compact) 40.sp else 42.sp,
                 fontFamily = FredokaFont,
                 fontWeight = FontWeight.ExtraBold,
-                color = DashboardBluePrimary,
+                color = accentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = if (compact) 31.sp else 35.sp,
@@ -496,7 +500,7 @@ private fun GreetingHeader(userName: String, compact: Boolean) {
                 fontSize = if (compact) 15.sp else 16.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FredokaFont,
-                color = DashboardBluePrimary.copy(alpha = 0.68f),
+                color = accentColor.copy(alpha = 0.68f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp)
@@ -504,7 +508,7 @@ private fun GreetingHeader(userName: String, compact: Boolean) {
         }
         Text(
             text = "✦",
-            color = DashboardBlueSecondary,
+            color = accentColor.copy(alpha = 0.5f),
             fontSize = if (compact) 22.sp else 25.sp,
             modifier = Modifier.padding(start = 8.dp)
         )
@@ -641,7 +645,7 @@ private fun DecorativeCloud(
 }
 
 @Composable
-private fun MotivationCard(message: String, compact: Boolean) {
+private fun MotivationCard(message: String, compact: Boolean, accentColor: Color) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -683,7 +687,7 @@ private fun MotivationCard(message: String, compact: Boolean) {
                     text = "¡Vas muy bien!",
                     fontSize = if (compact) 16.sp else 18.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF6B72E8),
+                    color = accentColor,
                     lineHeight = if (compact) 18.sp else 20.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -786,7 +790,7 @@ private fun DashboardMetricCard(
 }
 
 @Composable
-private fun StartStudyButton(onStartSession: () -> Unit, compact: Boolean) {
+private fun StartStudyButton(onStartSession: () -> Unit, compact: Boolean, accentColor: Color) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -796,9 +800,9 @@ private fun StartStudyButton(onStartSession: () -> Unit, compact: Boolean) {
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
-                        Color(0xFF58C8F8),
-                        DashboardBluePrimary,
-                        DashboardBlueSecondary
+                        accentColor.copy(alpha = 0.8f),
+                        accentColor,
+                        accentColor.copy(alpha = 0.9f)
                     )
                 )
             )
@@ -838,7 +842,7 @@ private fun StartStudyButton(onStartSession: () -> Unit, compact: Boolean) {
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = null,
-                    tint = DashboardBluePrimary,
+                    tint = accentColor,
                     modifier = Modifier.size(if (compact) 25.dp else 29.dp)
                 )
             }
