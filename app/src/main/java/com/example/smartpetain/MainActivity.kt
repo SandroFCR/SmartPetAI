@@ -181,6 +181,7 @@ fun AppNavigator(
                 currentScreen = "dashboard"
                 startSessionAsBreak = false
             },
+            equippedPetName = equippedPet,
             sessionDurationMinutes = pomodoroDuration,
             startAsBreak = startSessionAsBreak,
             onPomodoroChanged = { duration ->

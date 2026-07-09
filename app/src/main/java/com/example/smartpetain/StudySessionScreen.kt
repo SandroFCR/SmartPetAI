@@ -4,48 +4,45 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.smartpetain.ui.theme.AmberPrimary
-import com.example.smartpetain.ui.theme.Background
-import com.example.smartpetain.ui.theme.PinkPrimary
+import com.example.smartpetain.ui.theme.FredokaFont
 import com.example.smartpetain.ui.theme.PurpleLight
 import com.example.smartpetain.ui.theme.PurplePrimary
-import com.example.smartpetain.ui.theme.TealPrimary
-import com.example.smartpetain.ui.theme.TextPrimary
-import com.example.smartpetain.ui.theme.TextSecondary
 import com.example.smartpetain.ui.theme.White
 import kotlinx.coroutines.delay
 
@@ -57,6 +54,7 @@ private enum class PomodoroPhase {
 @Composable
 fun StudySessionScreen(
     onBack: () -> Unit,
+    equippedPetName: String = "Cinnamoroll",
     sessionDurationMinutes: Int = 25,
     startAsBreak: Boolean = false,
     onPomodoroChanged: (Int) -> Unit = {},
@@ -66,6 +64,7 @@ fun StudySessionScreen(
 ) {
     val breakDurationSeconds = 5 * 60
     val studyDurationSeconds = sessionDurationMinutes * 60
+    
     var phase by remember { mutableStateOf(if (startAsBreak) PomodoroPhase.BREAK else PomodoroPhase.STUDY) }
     var timeLeft by remember(sessionDurationMinutes, startAsBreak) {
         mutableStateOf(if (startAsBreak) breakDurationSeconds else studyDurationSeconds)
@@ -73,11 +72,23 @@ fun StudySessionScreen(
     var isRunning by remember { mutableStateOf(startAsBreak) }
     var sessionTime by remember { mutableStateOf(0) }
     var lastMinuteReported by remember { mutableStateOf(0) }
-    var recentSessions by remember { mutableStateOf<List<StudySessionRecord>>(emptyList()) }
+    
     val context = LocalContext.current
     val totalSeconds = if (phase == PomodoroPhase.STUDY) studyDurationSeconds else breakDurationSeconds
-    val progress = 1f - (timeLeft / totalSeconds.toFloat())
-    val canChangeDuration = !isRunning && phase == PomodoroPhase.STUDY && sessionTime == 0
+    val progress = timeLeft / totalSeconds.toFloat()
+
+    // Theme based on mascot (consistency with Dashboard)
+    val themeColor = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> Color(0xFF5DA9FF) // Cinnamoroll Blue
+    }
+    
+    val themeBg = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFFFF9C4)
+        "Hello Kitty" -> Color(0xFFFCE4EC)
+        else -> Color(0xFFEAF7FF) // Light blue as in image_3
+    }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -87,7 +98,6 @@ fun StudySessionScreen(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        recentSessions = FirebaseManager.loadRecentStudySessions()
     }
 
     LaunchedEffect(isRunning, phase) {
@@ -110,21 +120,13 @@ fun StudySessionScreen(
                     val studiedMinutes = sessionTime / 60
                     SmartPetNotificationManager.sendBreakNotification(context)
                     onSessionFinished(studiedMinutes)
-                    recentSessions = listOf(
-                        StudySessionRecord(
-                            minutes = studiedMinutes,
-                            character = "Cinnamoroll",
-                            date = "Hoy",
-                            timestamp = System.currentTimeMillis()
-                        )
-                    ) + recentSessions.take(4)
                     phase = PomodoroPhase.BREAK
                     timeLeft = breakDurationSeconds
                     sessionTime = 0
                     lastMinuteReported = 0
                 } else {
                     SmartPetNotificationManager.sendStudyNotification(context)
-                    onBreakFinished(breakDurationSeconds / 60)
+                    onBreakFinished(5)
                     phase = PomodoroPhase.STUDY
                     timeLeft = studyDurationSeconds
                     isRunning = false
@@ -135,220 +137,264 @@ fun StudySessionScreen(
 
     val minutes = timeLeft / 60
     val seconds = timeLeft % 60
-    val phaseTitle = if (phase == PomodoroPhase.STUDY) "Sesion de estudio" else "Descanso"
-    val statusText = when {
-        isRunning && phase == PomodoroPhase.STUDY -> "En sesion"
-        isRunning && phase == PomodoroPhase.BREAK -> "Descansando"
-        phase == PomodoroPhase.BREAK -> "Descanso listo"
-        else -> "Listo para empezar"
-    }
-    val character = when (phase) {
-        PomodoroPhase.BREAK -> "Descansa 5 minutos. La alarma te avisara al terminar."
-        PomodoroPhase.STUDY -> when {
-            sessionTime >= studyDurationSeconds -> "Cinnamoroll esta muy orgulloso!"
-            sessionTime >= 10 * 60 -> "Cinnamoroll: Sigue asi, vas genial!"
-            else -> "Cinnamoroll: Tu puedes! Concentrate."
-        }
-    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .background(themeBg)
+            .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = onBack) {
-                Text(text = "<- Volver", color = PurplePrimary, fontSize = 16.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = PurpleLight),
-            elevation = CardDefaults.cardElevation(0.dp)
+        // Top Bar with circular backgrounds for a clean look
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            IconButton(
+                onClick = onBack, 
+                modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = themeColor, modifier = Modifier.size(22.dp))
+            }
+            Text(
+                text = "Sesión de estudio",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FredokaFont,
+                color = themeColor
+            )
+            IconButton(
+                onClick = { }, 
+                modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
+            ) {
+                Icon(Icons.Default.MusicNote, contentDescription = "Música", tint = themeColor, modifier = Modifier.size(22.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Motivational Chip & Duration Adjustment Row
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Motivational Chip
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = White.copy(alpha = 0.7f)
+            ) {
                 Text(
-                    text = character,
-                    fontSize = 15.sp,
-                    color = PurplePrimary,
-                    fontWeight = FontWeight.Medium
+                    text = if (phase == PomodoroPhase.STUDY) "¡Tú puedes! 💙" else "¡Merecido descanso! 🍮",
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+                    color = themeColor,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FredokaFont,
+                    fontSize = 15.sp
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            }
+            
+            // Duration adjustment buttons if not running
+            if (!isRunning && phase == PomodoroPhase.STUDY && sessionTime == 0) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = themeColor.copy(alpha = 0.15f)
                 ) {
-                    Column {
-                        Text("Duracion Pomodoro", fontSize = 13.sp, color = TextSecondary)
-                        Text(
-                            "$sessionDurationMinutes minutos",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            enabled = canChangeDuration && sessionDurationMinutes > 5,
-                            onClick = { onPomodoroChanged(sessionDurationMinutes - 5) }
-                        ) {
-                            Text("-", fontSize = 22.sp, color = PurplePrimary, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        IconButton(onClick = { if (sessionDurationMinutes > 5) onPomodoroChanged(sessionDurationMinutes - 5) }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Remove, contentDescription = null, tint = themeColor, modifier = Modifier.size(16.dp))
                         }
-                        IconButton(
-                            enabled = canChangeDuration && sessionDurationMinutes < 60,
-                            onClick = { onPomodoroChanged(sessionDurationMinutes + 5) }
-                        ) {
-                            Text("+", fontSize = 22.sp, color = PurplePrimary, fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { if (sessionDurationMinutes < 60) onPomodoroChanged(sessionDurationMinutes + 5) }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = themeColor, modifier = Modifier.size(16.dp))
                         }
                     }
-                }
-                if (!canChangeDuration) {
-                    Text(
-                        text = "La duracion solo se cambia antes de iniciar.",
-                        fontSize = 12.sp,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // Timer Area
+        Box(
+            modifier = Modifier.size(320.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Circular Progress with dots effect
+            Canvas(modifier = Modifier.size(280.dp)) {
+                // Outer dotted circle
+                drawCircle(
+                    color = themeColor.copy(alpha = 0.2f),
+                    style = Stroke(
+                        width = 4.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    )
+                )
+                
+                // Active progress arc
+                val sweepAngle = 360f * progress
+                drawArc(
+                    color = themeColor,
+                    startAngle = -90f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
 
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.size(220.dp),
-                color = if (phase == PomodoroPhase.STUDY) PurplePrimary else TealPrimary,
-                trackColor = PurpleLight,
-                strokeWidth = 10.dp
-            )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "%02d:%02d".format(minutes, seconds),
-                    fontSize = 52.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    fontSize = 76.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FredokaFont,
+                    color = themeColor
                 )
-                Text(text = phaseTitle, fontSize = 14.sp, color = TextPrimary)
-                Text(text = statusText, fontSize = 12.sp, color = TextSecondary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.productividad),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (phase == PomodoroPhase.STUDY) themeColor else Color.Gray
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (phase == PomodoroPhase.STUDY) "Enfoque" else "Descanso",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FredokaFont,
+                        color = themeColor.copy(alpha = 0.8f)
+                    )
+                }
+            }
+
+            // Mascot Image
+            val petRes = R.drawable.cinnamoroll_echado
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 90.dp) // Adjusted for better framing
+            ) {
+                Image(
+                    painter = painterResource(id = petRes),
+                    contentDescription = "Cinnamoroll",
+                    modifier = Modifier.size(240.dp),
+                    contentScale = ContentScale.Fit
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        Spacer(modifier = Modifier.height(25.dp)) // Moved card up significantly
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(
-                onClick = { isRunning = !isRunning },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRunning) AmberPrimary else PurplePrimary
-                )
+        // Info Card with improved framing
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp) // Adjusted padding
+                .shadow(16.dp, RoundedCornerShape(28.dp), ambientColor = Color.LightGray.copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = White),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (isRunning) "Pausar" else "Iniciar",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (phase == PomodoroPhase.STUDY) "Estás en modo enfoque" else "Estás en modo descanso",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FredokaFont,
+                        color = Color(0xFF3B5998) // Darker blue for contrast as in image_2
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (phase == PomodoroPhase.STUDY) "Evita distracciones y aprovecha al máximo." else "Recupera energías para seguir después.",
+                        fontSize = 14.sp,
+                        fontFamily = FredokaFont,
+                        color = Color.Gray,
+                        lineHeight = 20.sp
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                // Plant Icon (using productivity drawable as reference)
+                Image(
+                    painter = painterResource(id = R.drawable.productividad),
+                    contentDescription = null,
+                    modifier = Modifier.size(60.dp),
+                    contentScale = ContentScale.Fit
                 )
-            }
-
-            Button(
-                onClick = {
-                    isRunning = false
-                    phase = PomodoroPhase.STUDY
-                    timeLeft = studyDurationSeconds
-                    sessionTime = 0
-                    lastMinuteReported = 0
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary)
-            ) {
-                Text(text = "Reiniciar", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
-        Text(
-            text = "Tiempo en sesion: %02d:%02d".format(sessionTime / 60, sessionTime % 60),
-            fontSize = 14.sp,
-            color = TextSecondary
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        SessionHistoryCard(recentSessions)
-    }
-}
-
-@Composable
-private fun SessionHistoryCard(recentSessions: List<StudySessionRecord>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = White),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Historial de sesiones",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            if (recentSessions.isEmpty()) {
-                Text(
-                    text = "Completa una sesion para verla aqui.",
-                    fontSize = 13.sp,
-                    color = TextSecondary
-                )
-            } else {
-                recentSessions.forEach { session ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = session.character,
-                                fontSize = 14.sp,
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = session.date,
-                                fontSize = 12.sp,
-                                color = TextSecondary
-                            )
-                        }
-                        Text(
-                            text = "${session.minutes} min",
-                            fontSize = 14.sp,
-                            color = PurplePrimary,
-                            fontWeight = FontWeight.Bold
+        // Controls Area (Redesigned side squircle buttons and solid central circle)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 36.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Pausar Button
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(
+                    onClick = { isRunning = !isRunning },
+                    modifier = Modifier.size(68.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    color = Color(0xFFFFF9C4)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = "Pausar",
+                            tint = Color(0xFFE8A900),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
+                Text("Pausar", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
+            }
+
+            // Big Central Play/Pause
+            Surface(
+                onClick = { isRunning = !isRunning },
+                modifier = Modifier.size(105.dp).shadow(14.dp, CircleShape),
+                shape = CircleShape,
+                color = themeColor
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = White
+                    )
+                }
+            }
+
+            // Terminar Button
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(
+                    onClick = {
+                        isRunning = false
+                        phase = PomodoroPhase.STUDY
+                        timeLeft = studyDurationSeconds
+                        sessionTime = 0
+                    },
+                    modifier = Modifier.size(68.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    color = Color(0xFFFFE0E0)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = "Terminar",
+                            tint = Color(0xFFD4537E),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                Text("Terminar", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }
