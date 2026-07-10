@@ -259,7 +259,8 @@ fun AppNavigator(
 
                 "stats" -> StatsScreen(
                     onBack = { currentScreen = "dashboard" },
-                    totalStudyMinutes = totalStudyMinutes
+                    totalStudyMinutes = totalStudyMinutes,
+                    equippedPetName = equippedPet
                 )
 
                 "characters" -> CharactersScreen(
@@ -303,6 +304,7 @@ fun AppNavigator(
                 "profile" -> ProfileScreen(
                     totalStudyMinutes = totalStudyMinutes,
                     completedTasks = completedTasks,
+                    equippedPetName = equippedPet,
                     onProfileChanged = { newName -> 
                         userName = newName 
                         refreshTrigger++

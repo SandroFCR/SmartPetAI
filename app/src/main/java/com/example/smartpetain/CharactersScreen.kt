@@ -113,12 +113,12 @@ fun CharactersScreen(
     var isCoachLoading by remember { mutableStateOf(true) }
     var coachRecommendation by remember {
         mutableStateOf(
-            buildCoachRecommendation(
-                weekStats = weekStats,
-                dailyGoalMinutes = dailyGoalMinutes,
-                completedTasks = completedTasks,
-                pendingTasks = pendingTasks,
-                characters = characters
+            CoachRecommendation(
+                characterName = "Cinnamoroll",
+                title = "Analizando...",
+                message = "Espera un momento...",
+                reason = "Cargando datos",
+                weeklyProgress = ""
             )
         )
     }
@@ -132,24 +132,28 @@ fun CharactersScreen(
         dailyGoalMinutes = loadedDailyGoalMinutes
         weekStats = loadedWeekStats
         
-        val fallbackRecommendation = buildCoachRecommendation(
-            weekStats = loadedWeekStats,
-            dailyGoalMinutes = loadedDailyGoalMinutes,
-            completedTasks = completedTasks,
-            pendingTasks = pendingTasks,
-            characters = characters
-        )
-        coachRecommendation = fallbackRecommendation
-        
         coachRecommendation = FirebaseManager.generateStudyCoachRecommendation(
             weekStats = loadedWeekStats,
             dailyGoalMinutes = loadedDailyGoalMinutes,
             completedTasks = completedTasks,
             pendingTasks = pendingTasks,
             pets = petStatsList,
-            fallback = fallbackRecommendation
+            fallback = coachRecommendation
         )
         isCoachLoading = false
+    }
+
+    // Theme based on mascot
+    val themeColor = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> Color(0xFF5DA9FF)
+    }
+    
+    val themeBg = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFFFF9C4)
+        "Hello Kitty" -> Color(0xFFFCE4EC)
+        else -> Color(0xFFEAF7FF)
     }
 
     selectedCharacter?.let { character ->
@@ -171,7 +175,7 @@ fun CharactersScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(themeBg)
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
@@ -181,7 +185,7 @@ fun CharactersScreen(
             text = "Mis mascotas",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary
+            color = themeColor
         )
         Text(
             text = "Mascota equipada: $equippedPetName",
@@ -195,10 +199,11 @@ fun CharactersScreen(
         CoachRecommendationCard(
             recommendation = coachRecommendation,
             isLoading = isCoachLoading,
-            characters = characters
+            characters = characters,
+            themeColor = themeColor
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         characters.forEach { character ->
             CharacterCard(
@@ -210,142 +215,22 @@ fun CharactersScreen(
     }
 }
 
-private fun buildCoachRecommendation(
-    weekStats: List<DayStats>,
-    dailyGoalMinutes: Int,
-    completedTasks: Int,
-    pendingTasks: Int,
-    characters: List<CharacterInfo>
-): CoachRecommendation {
-    val safeDailyGoal = dailyGoalMinutes.coerceAtLeast(1)
-    val weeklyGoal = safeDailyGoal * 7
-    val effectiveMinutes = weekStats.sumOf { it.minutes.coerceAtMost(safeDailyGoal) }
-    val productivity = ((effectiveMinutes / weeklyGoal.toFloat()) * 100).toInt().coerceIn(0, 100)
-    val remainingWeeklyMinutes = (weeklyGoal - effectiveMinutes).coerceAtLeast(0)
-    val todayStats = weekStats.getOrNull(currentWeekIndex())
-    val todayMinutes = todayStats?.minutes ?: 0
-    val remainingTodayMinutes = (safeDailyGoal - todayMinutes).coerceAtLeast(0)
-
-    val selectedCharacterName = when {
-        pendingTasks >= 3 -> "Hello Kitty"
-        remainingTodayMinutes > 0 -> "Cinnamoroll"
-        completedTasks > 0 && productivity >= 60 -> "Pompompurin"
-        else -> characters.maxByOrNull { it.xp }?.name ?: "Cinnamoroll"
-    }
-
-    val title = when (selectedCharacterName) {
-        "Hello Kitty" -> "Ordena tus pendientes"
-        "Pompompurin" -> "Buen ritmo, cuida tu energia"
-        else -> "Sube tu enfoque de hoy"
-    }
-
-    val message = when {
-        remainingTodayMinutes > 0 -> {
-            "Estudia $remainingTodayMinutes min ahora para cumplir tu meta diaria y subir XP con $selectedCharacterName."
-        }
-        pendingTasks > 0 -> {
-            "Ya cumpliste tu meta de estudio. Completa una tarea pendiente para seguir ganando progreso."
-        }
-        else -> {
-            "Vas al dia. Haz una sesion corta de repaso para mantener tu racha activa."
-        }
-    }
-
-    val reason = when (selectedCharacterName) {
-        "Hello Kitty" -> "Te conviene porque tienes $pendingTasks tareas pendientes y esta mascota mejora con organizacion."
-        "Pompompurin" -> "Te conviene porque ya avanzaste y ahora toca sostener el equilibrio entre estudio y descanso."
-        else -> "Te conviene porque Cinnamoroll crece con tus minutos de enfoque y sesiones Pomodoro."
-    }
-
-    return CoachRecommendation(
-        characterName = selectedCharacterName,
-        title = title,
-        message = message,
-        reason = reason,
-        weeklyProgress = "$effectiveMinutes/$weeklyGoal min esta semana - $productivity%. Faltan $remainingWeeklyMinutes min."
-    )
-}
-
-private fun buildCharactersFromStats(
-    petStatsList: List<PetStats>,
-    equippedPetName: String,
-    todayCompletedMissions: List<Int>
-): List<CharacterInfo> {
-    return listOf("Cinnamoroll", "Pompompurin", "Hello Kitty").map { petName ->
-        val stats = petStatsList.find { it.name == petName } ?: PetStats(petName)
-        val level = stats.level
-        
-        when (petName) {
-            "Cinnamoroll" -> CharacterInfo(
-                name = "Cinnamoroll",
-                imageSource = ImageSource.Local(R.drawable.cinnamoroll),
-                role = "Motivacion y enfoque",
-                description = "Sube cuando estudias y completas sesiones Pomodoro.",
-                trigger = "Aparece al estudiar 25+ min seguidos",
-                level = level,
-                xp = stats.xp,
-                maxXp = stats.maxXp,
-                color = "purple",
-                detailMessage = "Cinnamoroll crece con tus minutos de estudio. Mientras mas constante seas, mas rapido sube de nivel.",
-                tips = listOf(
-                    CharacterTip("Completa un Pomodoro", "Estudia hasta terminar el timer.", 20 + (level * 5), "start_study", 101),
-                    CharacterTip("Estudia 10 min", "Minutos extra para tu nivel.", 10, "start_study", 102)
-                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
-                isActive = equippedPetName == "Cinnamoroll"
-            )
-            "Pompompurin" -> CharacterInfo(
-                name = "Pompompurin",
-                imageSource = ImageSource.Local(R.drawable.pompompurin),
-                role = "Descanso y equilibrio",
-                description = "Sube cuando mantienes buenos habitos y descansas.",
-                trigger = "Aparece tras 50+ min sin descanso",
-                level = level,
-                xp = stats.xp,
-                maxXp = stats.maxXp,
-                color = "amber",
-                detailMessage = "Pompompurin te ayuda a descansar a tiempo. Mejora cuando equilibras avance con pausas sanas.",
-                tips = listOf(
-                    CharacterTip("Descansa 5 min", "Toma una pausa real.", 15 + (level * 2), "take_break", 201),
-                    CharacterTip("Cierra una tarea", "Reduce tu carga mental.", 20, "add_task", 202)
-                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
-                isActive = equippedPetName == "Pompompurin"
-            )
-            else -> CharacterInfo(
-                name = "Hello Kitty",
-                imageSource = ImageSource.Local(R.drawable.hello_kitty),
-                role = "Organizacion",
-                description = "Sube cuando organizas tus pendientes.",
-                trigger = "Aparece con 3+ tareas pendientes",
-                level = level,
-                xp = stats.xp,
-                maxXp = stats.maxXp,
-                color = "pink",
-                detailMessage = "Hello Kitty mejora cuando tus tareas estan claras. Registra y ordena tus pendientes.",
-                tips = listOf(
-                    CharacterTip("Agrega una tarea", "Registra lo que debes hacer.", 10 + (level * 3), "add_task", 301),
-                    CharacterTip("Ordena por prioridad", "Empieza por lo urgente.", 10, "sort_priority", 302)
-                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
-                isActive = equippedPetName == "Hello Kitty"
-            )
-        }
-    }
-}
-
 @Composable
 private fun CoachRecommendationCard(
     recommendation: CoachRecommendation,
     isLoading: Boolean,
-    characters: List<CharacterInfo>
+    characters: List<CharacterInfo>,
+    themeColor: Color
 ) {
     val character = characters.find { it.name == recommendation.characterName } ?: characters.first()
-    val cardColor = characterLightColor(character.color)
-    val accentColor = characterAccentColor(character.color)
+    val cardColor = themeColor.copy(alpha = 0.1f)
+    val accentColor = themeColor
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        colors = CardDefaults.cardColors(containerColor = White),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
@@ -417,7 +302,7 @@ private fun CoachRecommendationCard(
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = White.copy(alpha = 0.8f)
+                    color = cardColor
                 ) {
                     Text(
                         text = recommendation.weeklyProgress,
@@ -446,7 +331,7 @@ fun CharacterCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -574,7 +459,7 @@ private fun CharacterDetailScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
@@ -782,6 +667,77 @@ private fun characterAccentColor(colorName: String) = when (colorName) {
     else -> PurplePrimary
 }
 
+private fun buildCharactersFromStats(
+    petStatsList: List<PetStats>,
+    equippedPetName: String,
+    todayCompletedMissions: List<Int>
+): List<CharacterInfo> {
+    return listOf("Cinnamoroll", "Pompompurin", "Hello Kitty").map { petName ->
+        val stats = petStatsList.find { it.name == petName } ?: PetStats(petName)
+        val level = stats.level
+        
+        when (petName) {
+            "Cinnamoroll" -> CharacterInfo(
+                name = "Cinnamoroll",
+                imageSource = ImageSource.Local(R.drawable.cinnamoroll),
+                role = "Motivacion y enfoque",
+                description = "Sube cuando estudias y completas sesiones Pomodoro.",
+                trigger = "Aparece al estudiar 25+ min seguidos",
+                level = level,
+                xp = stats.xp,
+                maxXp = stats.maxXp,
+                color = "purple",
+                detailMessage = "Cinnamoroll crece con tus minutos de estudio. Mientras mas constante seas, mas rapido sube de nivel.",
+                tips = listOf(
+                    CharacterTip("Completa un Pomodoro", "Estudia hasta terminar el timer.", 25, "start_study", 101),
+                    CharacterTip("Estudia 10 min", "Minutos extra para tu nivel.", 10, "start_study", 102)
+                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
+                isActive = equippedPetName == "Cinnamoroll"
+            )
+            "Pompompurin" -> CharacterInfo(
+                name = "Pompompurin",
+                imageSource = ImageSource.Local(R.drawable.pompompurin),
+                role = "Descanso y equilibrio",
+                description = "Sube cuando mantienes buenos habitos y descansas.",
+                trigger = "Aparece tras 50+ min sin descanso",
+                level = level,
+                xp = stats.xp,
+                maxXp = stats.maxXp,
+                color = "amber",
+                detailMessage = "Pompompurin te ayuda a descansar a tiempo. Mejora cuando equilibras avance con pausas sanas.",
+                tips = listOf(
+                    CharacterTip("Descansa 5 min", "Toma una pausa real.", 15, "take_break", 201),
+                    CharacterTip("Cierra una tarea", "Reduce tu carga mental.", 20, "add_task", 202)
+                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
+                isActive = equippedPetName == "Pompompurin"
+            )
+            else -> CharacterInfo(
+                name = "Hello Kitty",
+                imageSource = ImageSource.Local(R.drawable.hello_kitty),
+                role = "Organizacion",
+                description = "Sube cuando organizas tus pendientes.",
+                trigger = "Aparece con 3+ tareas pendientes",
+                level = level,
+                xp = stats.xp,
+                maxXp = stats.maxXp,
+                color = "pink",
+                detailMessage = "Hello Kitty mejora cuando tus tareas estan claras. Registra y ordena tus pendientes.",
+                tips = listOf(
+                    CharacterTip("Agrega una tarea", "Registra lo que debes hacer.", 10, "add_task", 301),
+                    CharacterTip("Ordena por prioridad", "Empieza por lo urgente.", 10, "sort_priority", 302)
+                ).map { it.copy(isCompleted = todayCompletedMissions.contains(it.index)) },
+                isActive = equippedPetName == "Hello Kitty"
+            )
+        }
+    }
+}
+
+private fun emptyCharacterWeekStats(): List<DayStats> {
+    return listOf("Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom").map { day ->
+        DayStats(day = day, minutes = 0)
+    }
+}
+
 private fun currentWeekIndex(): Int {
     val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
     return when (day) {
@@ -792,11 +748,5 @@ private fun currentWeekIndex(): Int {
         java.util.Calendar.FRIDAY -> 4
         java.util.Calendar.SATURDAY -> 5
         else -> 6
-    }
-}
-
-private fun emptyCharacterWeekStats(): List<DayStats> {
-    return listOf("Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom").map { day ->
-        DayStats(day = day, minutes = 0)
     }
 }

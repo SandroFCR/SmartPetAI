@@ -33,7 +33,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 fun ProfileScreen(
     totalStudyMinutes: Int = 0,
     completedTasks: Int = 0,
+    equippedPetName: String = "Cinnamoroll",
     onProfileChanged: (String) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
@@ -78,6 +79,19 @@ fun ProfileScreen(
     LaunchedEffect(Unit) {
         profile = FirebaseManager.loadProfile()
         tempName = profile.name
+    }
+
+    // Theme based on mascot
+    val themeColor = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> Color(0xFF5DA9FF)
+    }
+    
+    val themeBg = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFFFF9C4)
+        "Hello Kitty" -> Color(0xFFFCE4EC)
+        else -> Color(0xFFEAF7FF)
     }
 
     val imagePicker = rememberLauncherForActivityResult(
@@ -107,7 +121,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(themeBg)
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -118,7 +132,7 @@ fun ProfileScreen(
             text = "Perfil",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary,
+            color = themeColor,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -128,7 +142,7 @@ fun ProfileScreen(
             val avatarModifier = Modifier
                 .size(96.dp)
                 .clip(CircleShape)
-                .border(2.dp, PurplePrimary, CircleShape)
+                .border(2.dp, themeColor, CircleShape)
                 .clickable(enabled = !isUploadingAvatar) { imagePicker.launch("image/*") }
 
             val avatarModel = localAvatarUri ?: profile.avatarUrl
@@ -142,14 +156,14 @@ fun ProfileScreen(
                 )
             } else {
                 Box(
-                    modifier = avatarModifier.background(PurpleLight),
+                    modifier = avatarModifier.background(themeColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Person,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp),
-                        tint = PurplePrimary
+                        tint = themeColor
                     )
                 }
             }
@@ -158,7 +172,7 @@ fun ProfileScreen(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(PurplePrimary),
+                    .background(themeColor),
                 contentAlignment = Alignment.Center
             ) {
                 if (isUploadingAvatar) {
@@ -212,7 +226,7 @@ fun ProfileScreen(
                             FirebaseManager.saveProfile(updatedProfile)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColor),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("OK")
@@ -262,7 +276,7 @@ fun ProfileScreen(
                         text = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PurplePrimary
+                        color = themeColor
                     )
                     Text("Tiempo estudiado", fontSize = 11.sp, color = TextSecondary)
                 }
@@ -270,14 +284,14 @@ fun ProfileScreen(
                     modifier = Modifier
                         .height(40.dp)
                         .width(1.dp),
-                    color = PurpleLight
+                    color = themeColor.copy(alpha = 0.2f)
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "$completedTasks",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PurplePrimary
+                        color = themeColor
                     )
                     Text("Tareas completadas", fontSize = 11.sp, color = TextSecondary)
                 }
@@ -319,7 +333,7 @@ fun ProfileScreen(
                         "${profile.pomodoroDuration} min",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PurplePrimary
+                        color = themeColor
                     )
                 }
             }
@@ -334,8 +348,8 @@ fun ProfileScreen(
                 .height(54.dp),
             shape = RoundedCornerShape(18.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = PurpleLight,
-                contentColor = PurplePrimary
+                containerColor = themeColor.copy(alpha = 0.2f),
+                contentColor = themeColor
             )
         ) {
             Icon(

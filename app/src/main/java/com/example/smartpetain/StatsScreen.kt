@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,7 +62,8 @@ data class DayStats(
 @Composable
 fun StatsScreen(
     onBack: () -> Unit,
-    totalStudyMinutes: Int = 0
+    totalStudyMinutes: Int = 0,
+    equippedPetName: String = "Cinnamoroll"
 ) {
     var weekStats by remember { mutableStateOf(emptyWeekStats()) }
     var dailyGoalMinutes by remember { mutableStateOf(25) }
@@ -73,6 +75,19 @@ fun StatsScreen(
         weekStats = FirebaseManager.loadWeekStats()
         summary = FirebaseManager.loadPomodoroStatsSummary()
         isLoading = false
+    }
+
+    // Theme based on mascot
+    val themeColor = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> Color(0xFF5DA9FF)
+    }
+    
+    val themeBg = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFFFF9C4)
+        "Hello Kitty" -> Color(0xFFFCE4EC)
+        else -> Color(0xFFEAF7FF)
     }
 
     val maxMinutes = weekStats.maxOf { it.minutes }.coerceAtLeast(1)
@@ -93,7 +108,7 @@ fun StatsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(themeBg)
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
@@ -101,11 +116,11 @@ fun StatsScreen(
 
         Row(modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = onBack) {
-                Text("<- Volver", color = PurplePrimary, fontSize = 16.sp)
+                Text("<- Volver", color = themeColor, fontSize = 16.sp)
             }
         }
 
-        PomodoroStatsHero()
+        PomodoroStatsHero(themeColor)
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -114,7 +129,8 @@ fun StatsScreen(
             weekStats = weekStats,
             maxMinutes = maxMinutes,
             todayLabel = todayLabel,
-            isLoading = isLoading
+            isLoading = isLoading,
+            themeColor = themeColor
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -124,7 +140,8 @@ fun StatsScreen(
             weeklyGoalMinutes = weeklyGoalMinutes,
             dailyGoalMinutes = dailyGoalMinutes,
             productivity = productivity,
-            productivityLabel = productivityLabel
+            productivityLabel = productivityLabel,
+            themeColor = themeColor
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -135,14 +152,16 @@ fun StatsScreen(
                 value = "${summary.totalPomodoros}",
                 title = "Pomodoros totales",
                 subtitle = "completados",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                themeColor = themeColor
             )
             MetricCard(
                 imageRes = R.drawable.pompompurin,
                 value = formatMinutes(summary.totalBreakMinutes),
                 title = "Descanso total",
                 subtitle = "pausas completadas",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                themeColor = themeColor
             )
         }
 
@@ -154,14 +173,16 @@ fun StatsScreen(
                 value = "${summary.todayPomodoros}",
                 title = "Pomodoros hoy",
                 subtitle = "registrados hoy",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                themeColor = themeColor
             )
             MetricCard(
                 imageRes = R.drawable.productividad,
                 value = "${summary.weekPomodoros}",
                 title = "Esta semana",
                 subtitle = "Pomodoros completos",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                themeColor = themeColor
             )
         }
 
@@ -173,33 +194,16 @@ fun StatsScreen(
                 value = "${summary.monthPomodoros}",
                 title = "Este mes",
                 subtitle = "Pomodoros completos",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                themeColor = themeColor
             )
             MetricCard(
                 imageRes = R.drawable.racha,
                 value = "${summary.bestProductivityStreak}",
                 title = "Mejor racha",
                 subtitle = "dias productivos",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        MetricRow {
-            MetricCard(
-                imageRes = R.drawable.racha,
-                value = "${summary.consecutivePomodoroDays}",
-                title = "Dias seguidos",
-                subtitle = "usando Pomodoro",
-                modifier = Modifier.weight(1f)
-            )
-            MetricCard(
-                imageRes = R.drawable.productividad,
-                value = formatAverage(summary.averageDailySessions),
-                title = "Promedio diario",
-                subtitle = "sesiones por dia",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                themeColor = themeColor
             )
         }
 
@@ -208,7 +212,7 @@ fun StatsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = PurpleLight),
+            colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.1f)),
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -216,7 +220,7 @@ fun StatsScreen(
                     text = "Analisis Pomodoro",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = PurplePrimary
+                    color = themeColor
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -228,7 +232,7 @@ fun StatsScreen(
                 Text(
                     text = "Productividad semanal: $productivity% ($productivityLabel)",
                     fontSize = 13.sp,
-                    color = PurplePrimary,
+                    color = themeColor,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -239,11 +243,11 @@ fun StatsScreen(
 }
 
 @Composable
-private fun PomodoroStatsHero() {
+private fun PomodoroStatsHero(themeColor: Color) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = PurpleLight),
+        colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.1f)),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
@@ -298,7 +302,8 @@ private fun StudyTimeCard(
     weekStats: List<DayStats>,
     maxMinutes: Int,
     todayLabel: String,
-    isLoading: Boolean
+    isLoading: Boolean,
+    themeColor: Color
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -322,7 +327,7 @@ private fun StudyTimeCard(
             Text(
                 text = if (totalTrackedStudy > 0) "Actualizado automaticamente desde el Pomodoro" else "Completa un Pomodoro para empezar",
                 fontSize = 13.sp,
-                color = TealPrimary,
+                color = themeColor,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -343,7 +348,7 @@ private fun StudyTimeCard(
                         .height(120.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = PurplePrimary)
+                    CircularProgressIndicator(color = themeColor)
                 }
             } else {
                 Row(
@@ -386,7 +391,7 @@ private fun StudyTimeCard(
                                             .width(28.dp)
                                             .height(barHeight)
                                             .background(
-                                                color = if (isToday) PurplePrimary else PurpleLight,
+                                                color = if (isToday) themeColor else themeColor.copy(alpha = 0.3f),
                                                 shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
                                             )
                                     )
@@ -396,7 +401,7 @@ private fun StudyTimeCard(
                             Text(
                                 text = day.day,
                                 fontSize = 11.sp,
-                                color = if (isToday) PurplePrimary else TextSecondary,
+                                color = if (isToday) themeColor else TextSecondary,
                                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
                             )
                         }
@@ -413,7 +418,8 @@ private fun WeeklyGoalCard(
     weeklyGoalMinutes: Int,
     dailyGoalMinutes: Int,
     productivity: Int,
-    productivityLabel: String
+    productivityLabel: String,
+    themeColor: Color
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -440,13 +446,13 @@ private fun WeeklyGoalCard(
                     .fillMaxWidth()
                     .height(8.dp)
                     .padding(top = 8.dp),
-                color = PurplePrimary,
-                trackColor = PurpleLight
+                color = themeColor,
+                trackColor = themeColor.copy(alpha = 0.1f)
             )
             Text(
                 text = "Objetivo diario: $dailyGoalMinutes min - $productivityLabel",
                 fontSize = 12.sp,
-                color = PurplePrimary,
+                color = themeColor,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 10.dp)
             )
@@ -469,7 +475,8 @@ private fun MetricCard(
     value: String,
     title: String,
     subtitle: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    themeColor: Color
 ) {
     Card(
         modifier = modifier
@@ -505,7 +512,7 @@ private fun MetricCard(
                 Text(
                     text = subtitle,
                     fontSize = 10.sp,
-                    color = TealPrimary,
+                    color = themeColor,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2
                 )
