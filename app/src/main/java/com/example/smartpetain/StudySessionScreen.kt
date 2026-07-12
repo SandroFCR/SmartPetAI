@@ -1,9 +1,14 @@
 package com.example.smartpetain
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.os.IBinder
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -22,6 +27,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,16 +43,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartpetain.ui.theme.FredokaFont
 import com.example.smartpetain.ui.theme.White
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 private enum class PomodoroPhase {
     STUDY,
-    BREAK
+    BREAK,
+    ALARM 
 }
 
 @Composable
@@ -62,40 +71,72 @@ fun StudySessionScreen(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val breakDurationSeconds = 5 * 60
-    val studyDurationSeconds = sessionDurationMinutes * 60
     
+    var pomodoroService by remember { mutableStateOf<PomodoroService?>(null) }
+    var isBound by remember { mutableStateOf(false) }
+
+    val connection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as PomodoroService.PomodoroBinder
+                pomodoroService = binder.getService()
+                isBound = true
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                isBound = false
+                pomodoroService = null
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val intent = Intent(context, PomodoroService::class.java)
+        context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        onDispose {
+            if (isBound) {
+                context.unbindService(connection)
+            }
+        }
+    }
+
+    val serviceTimeLeft by (pomodoroService?.timeLeft ?: MutableStateFlow(0L)).collectAsState()
+    val serviceIsRunning by (pomodoroService?.isRunning ?: MutableStateFlow(false)).collectAsState()
+    val servicePhase by (pomodoroService?.phase ?: MutableStateFlow("STUDY")).collectAsState()
+
     var phase by remember { mutableStateOf(if (startAsBreak) PomodoroPhase.BREAK else PomodoroPhase.STUDY) }
     var timeLeft by remember(sessionDurationMinutes, startAsBreak) {
-        mutableStateOf(if (startAsBreak) breakDurationSeconds else studyDurationSeconds)
+        mutableStateOf(if (startAsBreak) 5 * 60 * 1000L else sessionDurationMinutes * 60 * 1000L)
     }
-    var isRunning by remember { mutableStateOf(startAsBreak) }
-    var sessionTime by remember { mutableStateOf(0) }
+    var isRunning by remember { mutableStateOf(false) }
     var lastMinuteReported by remember { mutableStateOf(0) }
     
-    var showSoundPicker by remember { mutableStateOf(false) }
     var selectedSoundUri by remember { mutableStateOf<Uri?>(null) }
     var selectedSoundName by remember { mutableStateOf("Predeterminado") }
 
-    val totalSeconds = if (phase == PomodoroPhase.STUDY) studyDurationSeconds else breakDurationSeconds
-    val progress = timeLeft / totalSeconds.toFloat()
+    LaunchedEffect(serviceTimeLeft, serviceIsRunning, servicePhase) {
+        if (isBound) {
+            timeLeft = serviceTimeLeft
+            isRunning = serviceIsRunning
+            val currentPhase = if (servicePhase == "STUDY") PomodoroPhase.STUDY else PomodoroPhase.BREAK
+            if (phase != PomodoroPhase.ALARM) {
+                phase = currentPhase
+            }
+            
+            if (serviceTimeLeft == 0L && serviceIsRunning == false && (phase == PomodoroPhase.STUDY || phase == PomodoroPhase.BREAK)) {
+                phase = PomodoroPhase.ALARM
+            }
 
-    // Theme based on mascot
-    val themeColor = when (equippedPetName) {
-        "Pompompurin" -> Color(0xFFE8A900)
-        "Hello Kitty" -> Color(0xFFD4537E)
-        else -> Color(0xFF5DA9FF)
+            if (phase == PomodoroPhase.STUDY && isRunning) {
+                val totalElapsed = (sessionDurationMinutes * 60 * 1000L) - timeLeft
+                val currentMinute = (totalElapsed / 60000).toInt()
+                if (currentMinute > lastMinuteReported) {
+                    onMinuteStudied(1)
+                    lastMinuteReported = currentMinute
+                }
+            }
+        }
     }
-    
-    val themeBg = when (equippedPetName) {
-        "Pompompurin" -> Color(0xFFFFF9C4)
-        "Hello Kitty" -> Color(0xFFFCE4EC)
-        else -> Color(0xFFEAF7FF)
-    }
-
-    val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {}
 
     val soundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -114,9 +155,6 @@ fun StudySessionScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
         val profile = FirebaseManager.loadProfile()
         profile.alarmSoundUri?.let {
             selectedSoundUri = Uri.parse(it)
@@ -125,43 +163,60 @@ fun StudySessionScreen(
         }
     }
 
-    LaunchedEffect(isRunning, phase) {
-        while (isRunning) {
-            delay(1000L)
-            if (timeLeft > 0) {
-                timeLeft--
-                if (phase == PomodoroPhase.STUDY) {
-                    sessionTime++
-                    val currentMinute = sessionTime / 60
-                    if (currentMinute > lastMinuteReported) {
-                        lastMinuteReported = currentMinute
-                        onMinuteStudied(1)
-                    }
-                }
-            }
-
-            if (timeLeft == 0) {
-                if (phase == PomodoroPhase.STUDY) {
-                    val studiedMinutes = sessionTime / 60
-                    SmartPetNotificationManager.sendBreakNotification(context, selectedSoundUri)
-                    onSessionFinished(studiedMinutes)
-                    phase = PomodoroPhase.BREAK
-                    timeLeft = breakDurationSeconds
-                    sessionTime = 0
-                    lastMinuteReported = 0
-                } else {
-                    SmartPetNotificationManager.sendStudyNotification(context, selectedSoundUri)
-                    onBreakFinished(5)
-                    phase = PomodoroPhase.STUDY
-                    timeLeft = studyDurationSeconds
-                    isRunning = false
-                }
-            }
+    fun startTimer(minutes: Int) {
+        val intent = Intent(context, PomodoroService::class.java).apply {
+            action = "START"
+            putExtra("MINUTES", minutes)
+            putExtra("PHASE", if (phase == PomodoroPhase.BREAK) "BREAK" else "STUDY")
+            putExtra("SOUND_URI", selectedSoundUri?.toString())
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
         }
     }
 
-    val minutes = timeLeft / 60
-    val seconds = timeLeft % 60
+    fun pauseTimer() {
+        context.startService(Intent(context, PomodoroService::class.java).apply { action = "PAUSE" })
+    }
+
+    fun resumeTimer() {
+        context.startService(Intent(context, PomodoroService::class.java).apply { action = "RESUME" })
+    }
+
+    fun stopTimer() {
+        context.startService(Intent(context, PomodoroService::class.java).apply { action = "STOP" })
+        lastMinuteReported = 0
+    }
+
+    fun stopAlarmAndSwitch() {
+        context.startService(Intent(context, PomodoroService::class.java).apply { action = "STOP_ALARM" })
+        if (servicePhase == "STUDY") {
+            onSessionFinished(sessionDurationMinutes)
+            phase = PomodoroPhase.BREAK
+            timeLeft = 5 * 60 * 1000L
+        } else {
+            onBreakFinished(5)
+            phase = PomodoroPhase.STUDY
+            timeLeft = sessionDurationMinutes * 60 * 1000L
+        }
+    }
+
+    val minutes = (timeLeft / 1000) / 60
+    val seconds = (timeLeft / 1000) % 60
+
+    val themeColor = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFE8A900)
+        "Hello Kitty" -> Color(0xFFD4537E)
+        else -> Color(0xFF5DA9FF)
+    }
+    
+    val themeBg = when (equippedPetName) {
+        "Pompompurin" -> Color(0xFFFFF9C4)
+        "Hello Kitty" -> Color(0xFFFCE4EC)
+        else -> Color(0xFFEAF7FF)
+    }
 
     Column(
         modifier = Modifier
@@ -170,14 +225,13 @@ fun StudySessionScreen(
             .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Bar
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(
-                onClick = onBack, 
+                onClick = { stopTimer(); onBack() }, 
                 modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
             ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = themeColor, modifier = Modifier.size(22.dp))
@@ -191,7 +245,7 @@ fun StudySessionScreen(
             )
             IconButton(
                 onClick = {
-                    val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
                         putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
                         putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Selecciona Alarma")
                         putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
@@ -204,9 +258,8 @@ fun StudySessionScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(36.dp))
 
-        // Motivational Chip & Duration Adjustment Row
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
             horizontalArrangement = Arrangement.Center,
@@ -217,7 +270,11 @@ fun StudySessionScreen(
                 color = White.copy(alpha = 0.7f)
             ) {
                 Text(
-                    text = if (phase == PomodoroPhase.STUDY) "¡Tú puedes! 💙" else "¡Merecido descanso! 🍮",
+                    text = when(phase) {
+                        PomodoroPhase.STUDY -> "¡Tú puedes! 💙"
+                        PomodoroPhase.BREAK -> "¡A descansar! 🍮"
+                        PomodoroPhase.ALARM -> "¡Tiempo agotado! 🔔"
+                    },
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
                     color = themeColor,
                     fontWeight = FontWeight.Bold,
@@ -226,7 +283,7 @@ fun StudySessionScreen(
                 )
             }
             
-            if (!isRunning && phase == PomodoroPhase.STUDY && sessionTime == 0) {
+            if (!isRunning && phase != PomodoroPhase.ALARM && (timeLeft == sessionDurationMinutes * 60 * 1000L || timeLeft == 5 * 60 * 1000L)) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Surface(
                     shape = RoundedCornerShape(22.dp),
@@ -244,7 +301,6 @@ fun StudySessionScreen(
             }
         }
 
-        // Timer Area
         Box(
             modifier = Modifier.size(320.dp),
             contentAlignment = Alignment.Center
@@ -257,9 +313,10 @@ fun StudySessionScreen(
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                     )
                 )
-                val sweepAngle = 360f * progress
+                val totalMillis = if (phase == PomodoroPhase.BREAK) 5 * 60 * 1000L else sessionDurationMinutes * 60 * 1000L
+                val sweepAngle = 360f * (timeLeft / totalMillis.toFloat())
                 drawArc(
-                    color = themeColor,
+                    color = if (phase == PomodoroPhase.ALARM) Color.Red else themeColor,
                     startAngle = -90f,
                     sweepAngle = sweepAngle,
                     useCenter = false,
@@ -273,10 +330,14 @@ fun StudySessionScreen(
                     fontSize = 76.sp,
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = FredokaFont,
-                    color = themeColor
+                    color = if (phase == PomodoroPhase.ALARM) Color.Red else themeColor
                 )
                 Text(
-                    text = if (phase == PomodoroPhase.STUDY) "Enfoque" else "Descanso",
+                    text = when(phase) {
+                        PomodoroPhase.STUDY -> "Enfoque"
+                        PomodoroPhase.BREAK -> "Descanso"
+                        PomodoroPhase.ALARM -> "ALERTA"
+                    },
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FredokaFont,
@@ -295,7 +356,7 @@ fun StudySessionScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = 65.dp)
+                    .offset(y = 90.dp)
             ) {
                 Image(
                     painter = painterResource(id = petRes),
@@ -308,110 +369,128 @@ fun StudySessionScreen(
 
         Spacer(modifier = Modifier.height(25.dp))
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .shadow(16.dp, RoundedCornerShape(28.dp), ambientColor = Color.LightGray.copy(alpha = 0.4f)),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+        if (phase == PomodoroPhase.ALARM) {
+            Button(
+                onClick = { stopAlarmAndSwitch() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF007A))
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (phase == PomodoroPhase.STUDY) "Estás en modo enfoque" else "Estás en modo descanso",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FredokaFont,
-                        color = Color(0xFF3B5998)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (phase == PomodoroPhase.STUDY) "Evita distracciones y aprovecha al máximo." else "Recupera energías para seguir después.",
-                        fontSize = 14.sp,
-                        fontFamily = FredokaFont,
-                        color = Color.Gray,
-                        lineHeight = 20.sp
+                Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "DETENER ALARMA",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FredokaFont
+                )
+            }
+        } else {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .shadow(16.dp, RoundedCornerShape(28.dp), ambientColor = Color.LightGray.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (phase == PomodoroPhase.STUDY) "Estás en modo enfoque" else "Estás en modo descanso",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FredokaFont,
+                            color = Color(0xFF3B5998)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (phase == PomodoroPhase.STUDY) "Evita distracciones y aprovecha al máximo." else "Recupera energías para seguir después.",
+                            fontSize = 13.sp,
+                            fontFamily = FredokaFont,
+                            color = Color.Gray,
+                            lineHeight = 20.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.productividad),
+                        contentDescription = null,
+                        modifier = Modifier.size(60.dp),
+                        contentScale = ContentScale.Fit
                     )
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Image(
-                    painter = painterResource(id = R.drawable.productividad),
-                    contentDescription = null,
-                    modifier = Modifier.size(60.dp),
-                    contentScale = ContentScale.Fit
-                )
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 36.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (phase != PomodoroPhase.ALARM) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 36.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        onClick = { if (isRunning) pauseTimer() else resumeTimer() },
+                        modifier = Modifier.size(68.dp),
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color(0xFFFFF9C4)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = Color(0xFFE8A900),
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    Text(if (isRunning) "Pausar" else "Seguir", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
+                }
+
                 Surface(
-                    onClick = { isRunning = !isRunning },
-                    modifier = Modifier.size(68.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color(0xFFFFF9C4)
+                    onClick = { if (timeLeft > 0 && !isRunning && (timeLeft == sessionDurationMinutes * 60 * 1000L || timeLeft == 5 * 60 * 1000L)) startTimer(if (phase == PomodoroPhase.BREAK) 5 else sessionDurationMinutes) else if (isRunning) pauseTimer() else resumeTimer() },
+                    modifier = Modifier.size(105.dp).shadow(14.dp, CircleShape),
+                    shape = CircleShape,
+                    color = themeColor
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Pausar",
-                            tint = Color(0xFFE8A900),
-                            modifier = Modifier.size(32.dp)
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = White
                         )
                     }
                 }
-                Text("Pausar", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
-            }
 
-            Surface(
-                onClick = { isRunning = !isRunning },
-                modifier = Modifier.size(105.dp).shadow(14.dp, CircleShape),
-                shape = CircleShape,
-                color = themeColor
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = White
-                    )
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Surface(
-                    onClick = {
-                        isRunning = false
-                        phase = PomodoroPhase.STUDY
-                        timeLeft = studyDurationSeconds
-                        sessionTime = 0
-                    },
-                    modifier = Modifier.size(68.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    color = Color(0xFFFFE0E0)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Stop,
-                            contentDescription = "Terminar",
-                            tint = Color(0xFFD4537E),
-                            modifier = Modifier.size(32.dp)
-                        )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        onClick = { stopTimer() },
+                        modifier = Modifier.size(68.dp),
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color(0xFFFFE0E0)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "Terminar",
+                                tint = Color(0xFFD4537E),
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
+                    Text("Terminar", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
                 }
-                Text("Terminar", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }
