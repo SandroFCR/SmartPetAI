@@ -273,8 +273,6 @@ object FirebaseManager {
             if (!completedMissions.contains(301) && createdTasks >= 1) {
                 completeDailyMission("Hello Kitty", 301, 10)
             }
-            // Hello Kitty 2: Ordena por prioridad (302)
-            // Se activa manualmente en la UI
         } catch (e: Exception) {
             Log.e(TAG, "Error checking missions", e)
         }
@@ -607,9 +605,11 @@ object FirebaseManager {
                     )
                 },
                 "weekStats" to weekStats.map { day ->
+                    val effective = day.minutes.coerceAtMost(dailyGoalMinutes)
                     hashMapOf(
                         "day" to day.day,
                         "minutes" to day.minutes,
+                        "effectiveMinutes" to effective,
                         "completedSessions" to day.completedSessions
                     )
                 }

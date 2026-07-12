@@ -270,6 +270,7 @@ fun AppNavigator(
                     petStatsList = petStatsList,
                     equippedPetName = equippedPet,
                     todayCompletedMissions = todayCompletedMissions,
+                    dailyGoalMinutes = pomodoroDuration,
                     onEquipPet = { petName ->
                         equippedPet = petName
                         scope.launch {

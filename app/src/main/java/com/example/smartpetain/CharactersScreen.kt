@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -101,6 +102,7 @@ fun CharactersScreen(
     petStatsList: List<PetStats> = emptyList(),
     equippedPetName: String = "Cinnamoroll",
     todayCompletedMissions: List<Int> = emptyList(),
+    dailyGoalMinutes: Int = 25,
     onEquipPet: (String) -> Unit = {},
     onMissionAction: (String) -> Unit = {}
 ) {
@@ -109,41 +111,42 @@ fun CharactersScreen(
     }
     var selectedCharacter by remember { mutableStateOf<CharacterInfo?>(null) }
     var weekStats by remember { mutableStateOf(emptyCharacterWeekStats()) }
-    var dailyGoalMinutes by remember { mutableStateOf(25) }
     var isCoachLoading by remember { mutableStateOf(true) }
     var coachRecommendation by remember {
         mutableStateOf(
             CoachRecommendation(
-                characterName = "Cinnamoroll",
+                characterName = equippedPetName,
                 title = "Analizando...",
                 message = "Espera un momento...",
-                reason = "Cargando datos",
+                reason = "Cargando datos de estudio",
                 weeklyProgress = ""
             )
         )
     }
 
-    LaunchedEffect(petStatsList, characters) {
+    LaunchedEffect(petStatsList, characters, dailyGoalMinutes) {
         isCoachLoading = true
-        val profile = FirebaseManager.loadProfile()
-        val loadedDailyGoalMinutes = profile.pomodoroDuration
         val loadedWeekStats = FirebaseManager.loadWeekStats()
-        
-        dailyGoalMinutes = loadedDailyGoalMinutes
         weekStats = loadedWeekStats
         
-        coachRecommendation = FirebaseManager.generateStudyCoachRecommendation(
+        val result = FirebaseManager.generateStudyCoachRecommendation(
             weekStats = loadedWeekStats,
-            dailyGoalMinutes = loadedDailyGoalMinutes,
+            dailyGoalMinutes = dailyGoalMinutes,
             completedTasks = completedTasks,
             pendingTasks = pendingTasks,
             pets = petStatsList,
             fallback = coachRecommendation
         )
+        
+        // Sanitize all AI fields to be coherent and complete
+        coachRecommendation = result.copy(
+            title = finalizeAiMessage(result.title),
+            message = finalizeAiMessage(result.message),
+            reason = finalizeAiMessage(result.reason)
+        )
         isCoachLoading = false
     }
 
-    // Theme based on mascot
     val themeColor = when (equippedPetName) {
         "Pompompurin" -> Color(0xFFE8A900)
         "Hello Kitty" -> Color(0xFFD4537E)
@@ -200,10 +203,12 @@ fun CharactersScreen(
             recommendation = coachRecommendation,
             isLoading = isCoachLoading,
             characters = characters,
-            themeColor = themeColor
+            themeColor = themeColor,
+            weekStats = weekStats,
+            dailyGoalMinutes = dailyGoalMinutes
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         characters.forEach { character ->
             CharacterCard(
@@ -220,17 +225,26 @@ private fun CoachRecommendationCard(
     recommendation: CoachRecommendation,
     isLoading: Boolean,
     characters: List<CharacterInfo>,
-    themeColor: Color
+    themeColor: Color,
+    weekStats: List<DayStats>,
+    dailyGoalMinutes: Int
 ) {
     val character = characters.find { it.name == recommendation.characterName } ?: characters.first()
     val cardColor = themeColor.copy(alpha = 0.1f)
     val accentColor = themeColor
 
+    val safeDailyGoal = dailyGoalMinutes.coerceAtLeast(1)
+    val weeklyGoal = safeDailyGoal * 7
+    val effectiveMinutes = weekStats.sumOf { it.minutes.coerceAtMost(safeDailyGoal) }
+    val remainingWeeklyMinutes = (weeklyGoal - effectiveMinutes).coerceAtLeast(0)
+    val todayMinutes = weekStats.find { it.day == localDayLabel() }?.minutes ?: 0
+    val remainingToday = (safeDailyGoal - todayMinutes).coerceAtLeast(0)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = White),
-        elevation = CardDefaults.cardElevation(0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(
@@ -304,17 +318,71 @@ private fun CoachRecommendationCard(
                     shape = RoundedCornerShape(12.dp),
                     color = cardColor
                 ) {
-                    Text(
-                        text = recommendation.weeklyProgress,
-                        fontSize = 12.sp,
-                        color = accentColor,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            text = "Semana: $effectiveMinutes/$weeklyGoal min ($remainingWeeklyMinutes rest.)",
+                            fontSize = 11.sp,
+                            color = accentColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (remainingToday == 0) "Hoy: ¡Meta cumplida! ✨" else "Hoy: faltan $remainingToday min",
+                            fontSize = 11.sp,
+                            color = accentColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun finalizeAiMessage(rawMessage: String): String {
+    if (rawMessage.isBlank()) return "¡Sigue así! Vas por buen camino."
+    
+    // 1. Remove redundant stats info aggressively
+    val statsSentences = listOf("vas", "minutos totales", "restante", "semana", "meta es", "faltan")
+    val paragraphs = rawMessage.trim().split("\n\n", "\n")
+    
+    val planParagraphs = paragraphs.filter { p ->
+        val pLower = p.lowercase()
+        val statsCount = statsSentences.count { pLower.contains(it) }
+        statsCount < 2 || p.length > 50 
+    }
+    
+    var text = planParagraphs.joinToString("\n\n").trim()
+    if (text.isBlank()) text = rawMessage.trim()
+
+    // 2. TRUNCATE AT LAST FULL STOP
+    val lastStop = text.lastIndexOf('.')
+    val lastExclamation = text.lastIndexOf('!')
+    val lastQuestion = text.lastIndexOf('?')
+    val absoluteLastPunctuation = maxOf(lastStop, maxOf(lastExclamation, lastQuestion))
+    
+    if (absoluteLastPunctuation != -1 && absoluteLastPunctuation < text.length - 1) {
+        text = text.substring(0, absoluteLastPunctuation + 1)
+    }
+
+    // 3. Last resort cleanup of trailing conjunctions
+    val connectors = listOf(" y", " con", " para", " de", " que", ",", " así que", " además")
+    var cleaned = text.trim()
+    var changed = true
+    while(changed) {
+        changed = false
+        for (c in connectors) {
+            if (cleaned.endsWith(c, ignoreCase = true)) {
+                cleaned = cleaned.substring(0, cleaned.length - c.length).trim()
+                changed = true
+            }
+        }
+    }
+
+    if (cleaned.isNotEmpty() && !cleaned.endsWith(".") && !cleaned.endsWith("!") && !cleaned.endsWith("?")) {
+        cleaned += "."
+    }
+
+    return cleaned.ifBlank { "Plan de hoy: Enfócate en tus tareas pendientes y completa una sesión de estudio." }
 }
 
 @Composable
@@ -331,7 +399,7 @@ fun CharacterCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = White),
-        elevation = CardDefaults.cardElevation(0.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -459,7 +527,7 @@ private fun CharacterDetailScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = White),
-            elevation = CardDefaults.cardElevation(0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
@@ -738,15 +806,14 @@ private fun emptyCharacterWeekStats(): List<DayStats> {
     }
 }
 
-private fun currentWeekIndex(): Int {
-    val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
-    return when (day) {
-        java.util.Calendar.MONDAY -> 0
-        java.util.Calendar.TUESDAY -> 1
-        java.util.Calendar.WEDNESDAY -> 2
-        java.util.Calendar.THURSDAY -> 3
-        java.util.Calendar.FRIDAY -> 4
-        java.util.Calendar.SATURDAY -> 5
-        else -> 6
+private fun localDayLabel(): String {
+    return when (java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)) {
+        java.util.Calendar.MONDAY -> "Lun"
+        java.util.Calendar.TUESDAY -> "Mar"
+        java.util.Calendar.WEDNESDAY -> "Mie"
+        java.util.Calendar.THURSDAY -> "Jue"
+        java.util.Calendar.FRIDAY -> "Vie"
+        java.util.Calendar.SATURDAY -> "Sab"
+        else -> "Dom"
     }
 }
