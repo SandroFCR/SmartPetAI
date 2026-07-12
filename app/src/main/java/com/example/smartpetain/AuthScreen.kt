@@ -1,26 +1,32 @@
 package com.example.smartpetain
 
-import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,18 +39,35 @@ import com.example.smartpetain.ui.theme.*
 import com.google.firebase.auth.FirebaseAuthException
 import kotlinx.coroutines.launch
 
+private enum class AuthStep {
+    START,
+    LOGIN,
+    REGISTER_NAME,
+    REGISTER_CREDENTIALS,
+    VERIFY_EMAIL
+}
+
+// Colores Kawaii (Celeste & Blanco)
+private val KawaiiBlue = Color(0xFF5DA9FF)
+private val KawaiiBlueLight = Color(0xFFF2FAFF)
+private val KawaiiBackground = Color(0xFFFFFFFF)
+private val KawaiiTextDark = Color(0xFF2C2C2E)
+private val KawaiiTextSecondary = Color(0xFF8E8E93)
+
 @Composable
 fun AuthScreen(onAuthSuccess: () -> Unit) {
-    val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val scope = rememberCoroutineScope()
 
-    var isLogin by remember { mutableStateOf(true) }
+    var currentStep by remember { mutableStateOf(AuthStep.START) }
+    
+    // Form States
     var email by remember { mutableStateOf("") }
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
     
     var errorMsg by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -57,71 +80,23 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                 "ERROR_USER_NOT_FOUND" -> "No existe una cuenta con este correo."
                 "ERROR_USER_DISABLED" -> "Esta cuenta ha sido deshabilitada."
                 "ERROR_TOO_MANY_REQUESTS" -> "Demasiados intentos. Inténtalo más tarde."
-                "ERROR_EMAIL_ALREADY_IN_USE" -> "Este correo ya está registrado. Por favor, usa 'Iniciar sesión'."
+                "ERROR_EMAIL_ALREADY_IN_USE" -> "Este correo ya está registrado."
                 "ERROR_WEAK_PASSWORD" -> "La contraseña es muy débil (mínimo 6 caracteres)."
                 "ERROR_NETWORK_REQUEST_FAILED" -> "Error de red. Verifica tu conexión."
-                else -> "Error de autenticación: ${e.localizedMessage}"
+                else -> "Error: ${e.localizedMessage}"
             }
         }
-        
-        if (e is ApiException) {
-            return when (e.statusCode) {
-                10 -> "Error 10: Problema de configuración en Firebase (SHA-1). Verifica tu consola de Firebase."
-                7 -> "Error de red: No se pudo contactar con Google."
-                12500 -> "Error de actualización de Google Play Services."
-                else -> "Error de Google (${e.statusCode}): ${e.localizedMessage}"
-            }
-        }
-
-        return e.localizedMessage ?: "Ocurrió un error inesperado. Inténtalo de nuevo."
+        return e.localizedMessage ?: "Ocurrió un error inesperado."
     }
 
-    // Google Sign In
-    val googleLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-            auth.signInWithCredential(credential)
-                .addOnSuccessListener { onAuthSuccess() }
-                .addOnFailureListener { errorMsg = getErrorMessage(it) }
-        } catch (e: Exception) {
-            errorMsg = "Error con Google: ${e.message}"
-        }
-    }
-
-    fun loginWithGoogle() {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(context.getString(R.string.default_web_client_id))
-            .requestEmail()
-            .build()
-        val client = GoogleSignIn.getClient(context, gso)
-        googleLauncher.launch(client.signInIntent)
-    }
-
-    fun submitEmail() {
-        if (email.isBlank() || password.isBlank()) {
-            errorMsg = "Completa todos los campos"
-            return
-        }
-        
-        if (!isLogin) {
-            if (firstName.isBlank() || lastName.isBlank()) {
-                errorMsg = "Por favor ingresa tu nombre y apellido"
-                return
-            }
-            if (password != confirmPassword) {
-                errorMsg = "Las contraseñas no coinciden"
-                return
-            }
-        }
-
-        isLoading = true
+    fun handleAuth() {
         errorMsg = ""
-        
-        if (isLogin) {
+        if (currentStep == AuthStep.LOGIN) {
+            if (email.isBlank() || password.isBlank()) {
+                errorMsg = "Completa todos los campos"
+                return
+            }
+            isLoading = true
             auth.signInWithEmailAndPassword(email, password)
                 .addOnSuccessListener { 
                     isLoading = false
@@ -131,25 +106,35 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                     isLoading = false
                     errorMsg = getErrorMessage(it) 
                 }
-        } else {
+        } else if (currentStep == AuthStep.REGISTER_CREDENTIALS) {
+            if (email.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
+                errorMsg = "Completa todos los campos"
+                return
+            }
+            if (password != confirmPassword) {
+                errorMsg = "Las contraseñas no coinciden"
+                return
+            }
+            isLoading = true
             auth.createUserWithEmailAndPassword(email, password)
-                .addOnSuccessListener { 
+                .addOnSuccessListener { result ->
                     scope.launch {
                         try {
-                            FirebaseManager.saveProfile(
-                                UserProfile(name = "$firstName $lastName")
-                            )
+                            // Guardar perfil
+                            FirebaseManager.saveProfile(UserProfile(name = "$firstName $lastName"))
+                            // Enviar verificación
+                            result.user?.sendEmailVerification()
+                            currentStep = AuthStep.VERIFY_EMAIL
                         } catch (e: Exception) {
-                            // Ignorar error al guardar perfil inicial
+                            errorMsg = "Error al crear perfil: ${e.localizedMessage}"
                         } finally {
                             isLoading = false
-                            onAuthSuccess()
                         }
                     }
                 }
                 .addOnFailureListener { 
                     isLoading = false
-                    errorMsg = getErrorMessage(it)
+                    errorMsg = getErrorMessage(it) 
                 }
         }
     }
@@ -157,161 +142,263 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background)
+            .background(KawaiiBackground)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 32.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        if (currentStep != AuthStep.START) {
+            IconButton(
+                onClick = { 
+                    currentStep = when(currentStep) {
+                        AuthStep.LOGIN -> AuthStep.START
+                        AuthStep.REGISTER_NAME -> AuthStep.START
+                        AuthStep.REGISTER_CREDENTIALS -> AuthStep.REGISTER_NAME
+                        else -> AuthStep.START
+                    }
+                    errorMsg = ""
+                },
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = KawaiiBlue)
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
         
-        Text("🐾 SmartPetAI", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = PurplePrimary)
         Text(
-            text = "Tu compañero de estudio",
-            fontSize = 14.sp,
-            color = TextSecondary,
-            modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
+            text = "Bienvenido a",
+            color = KawaiiTextDark,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Light,
+            fontFamily = FredokaFont
         )
+        Text(
+            text = "smartpet",
+            color = KawaiiBlue,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Black,
+            fontFamily = FredokaFont
+        )
+        
+        Spacer(modifier = Modifier.height(40.dp))
 
-        // Tabs Login / Registro
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf("Iniciar sesión" to true, "Registrarse" to false).forEach { (label, value) ->
-                Button(
-                    onClick = { isLogin = value; errorMsg = "" },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isLogin == value) PurplePrimary else PurpleLight
-                    )
-                ) {
-                    Text(
-                        label,
-                        color = if (isLogin == value) White else PurplePrimary,
-                        fontSize = 14.sp
-                    )
+        when (currentStep) {
+            AuthStep.START -> {
+                KawaiiButton(text = "Inicia sesión", onClick = { currentStep = AuthStep.LOGIN })
+                Spacer(modifier = Modifier.height(16.dp))
+                KawaiiButton(text = "Crear cuenta", onClick = { currentStep = AuthStep.REGISTER_NAME }, outline = true)
+            }
+
+            AuthStep.LOGIN -> {
+                KawaiiTextField(value = email, onValueChange = { email = it }, label = "Correo electrónico")
+                Spacer(modifier = Modifier.height(16.dp))
+                KawaiiTextField(
+                    value = password, 
+                    onValueChange = { password = it }, 
+                    label = "Contraseña",
+                    isPassword = true,
+                    passwordVisible = passwordVisible,
+                    onVisibilityChange = { passwordVisible = !passwordVisible }
+                )
+                
+                Text(
+                    text = "¿Olvidaste tu contraseña?",
+                    color = KawaiiBlue,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .padding(vertical = 16.dp)
+                        .clickable {
+                            if (email.isNotBlank()) {
+                                auth.sendPasswordResetEmail(email)
+                                errorMsg = "Se ha enviado un correo para restablecer tu contraseña."
+                            } else {
+                                errorMsg = "Ingresa tu correo para restablecer la contraseña."
+                            }
+                        }
+                )
+
+                KawaiiButton(text = "Ingresar", onClick = { handleAuth() }, isLoading = isLoading)
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "¿Aún no tienes cuenta?",
+                    color = KawaiiTextSecondary,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = "Crear cuenta",
+                    color = KawaiiBlue,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clickable { currentStep = AuthStep.REGISTER_NAME }
+                )
+            }
+
+            AuthStep.REGISTER_NAME -> {
+                Text(text = "Crea tu cuenta", color = KawaiiTextDark, fontSize = 18.sp, modifier = Modifier.padding(bottom = 24.dp))
+                KawaiiTextField(value = firstName, onValueChange = { firstName = it }, label = "Nombre")
+                Spacer(modifier = Modifier.height(16.dp))
+                KawaiiTextField(value = lastName, onValueChange = { lastName = it }, label = "Apellidos")
+                Spacer(modifier = Modifier.height(24.dp))
+                KawaiiButton(text = "Continuar", onClick = { 
+                    if (firstName.isNotBlank() && lastName.isNotBlank()) {
+                        currentStep = AuthStep.REGISTER_CREDENTIALS 
+                    } else {
+                        errorMsg = "Ingresa tu nombre y apellidos"
+                    }
+                })
+            }
+
+            AuthStep.REGISTER_CREDENTIALS -> {
+                Text(text = "Escribe una clave", color = KawaiiBlue, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Úsala para mantener segura tu información.",
+                    color = KawaiiTextSecondary,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+                    textAlign = TextAlign.Center
+                )
+                KawaiiTextField(value = email, onValueChange = { email = it }, label = "Correo electrónico")
+                Spacer(modifier = Modifier.height(16.dp))
+                KawaiiTextField(
+                    value = password, 
+                    onValueChange = { password = it }, 
+                    label = "Contraseña",
+                    isPassword = true,
+                    passwordVisible = passwordVisible,
+                    onVisibilityChange = { passwordVisible = !passwordVisible }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                KawaiiTextField(
+                    value = confirmPassword, 
+                    onValueChange = { confirmPassword = it }, 
+                    label = "Confirmar contraseña",
+                    isPassword = true,
+                    passwordVisible = passwordVisible,
+                    onVisibilityChange = { passwordVisible = !passwordVisible }
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                KawaiiButton(text = "Crear cuenta", onClick = { handleAuth() }, isLoading = isLoading)
+            }
+
+            AuthStep.VERIFY_EMAIL -> {
+                Icon(Icons.Default.Email, contentDescription = null, tint = KawaiiBlue, modifier = Modifier.size(64.dp))
+                Text(
+                    text = "¡Casi listo!",
+                    color = KawaiiTextDark,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+                Text(
+                    text = "Hemos enviado un enlace de verificación a $email. Por favor, revisa tu bandeja de entrada para activar tu cuenta.",
+                    color = KawaiiTextSecondary,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+                KawaiiButton(text = "Ya verifiqué mi correo", onClick = { 
+                    auth.currentUser?.reload()?.addOnSuccessListener {
+                        if (auth.currentUser?.isEmailVerified == true) {
+                            onAuthSuccess()
+                        } else {
+                            errorMsg = "Aún no has verificado tu correo."
+                        }
+                    }
+                })
+                
+                TextButton(onClick = { 
+                    auth.currentUser?.sendEmailVerification()
+                    errorMsg = "Correo de verificación reenviado."
+                }) {
+                    Text("Reenviar correo", color = KawaiiBlue)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (!isLogin) {
-            OutlinedTextField(
-                value = firstName,
-                onValueChange = { firstName = it },
-                label = { Text("Nombre") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = lastName,
-                onValueChange = { lastName = it },
-                label = { Text("Apellido") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Correo electrónico") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Contraseña") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true
-        )
-
-        if (!isLogin) {
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirmar contraseña") },
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true
-            )
-        }
-
         if (errorMsg.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(errorMsg, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
+            Text(
+                text = errorMsg,
+                color = if (errorMsg.contains("enviado")) Color(0xFF1D9E75) else Color.Red,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 16.dp)
+            )
         }
+        
+        Spacer(modifier = Modifier.height(40.dp))
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = { submitEmail() },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
-            enabled = !isLoading
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(color = White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text(
-                    if (isLogin) "Iniciar sesión" else "Crear cuenta",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
+@Composable
+private fun KawaiiTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    isPassword: Boolean = false,
+    passwordVisible: Boolean = false,
+    onVisibilityChange: () -> Unit = {}
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = KawaiiTextSecondary) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(25.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = KawaiiBlue,
+            unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f),
+            focusedContainerColor = KawaiiBlueLight.copy(alpha = 0.3f),
+            unfocusedContainerColor = Color.Transparent,
+            cursorColor = KawaiiBlue,
+            focusedTextColor = KawaiiTextDark,
+            unfocusedTextColor = KawaiiTextDark
+        ),
+        visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+        trailingIcon = {
+            if (isPassword) {
+                IconButton(onClick = onVisibilityChange) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = null,
+                        tint = KawaiiTextSecondary
+                    )
+                }
             }
+        },
+        singleLine = true,
+        textStyle = TextStyle(color = KawaiiTextDark)
+    )
+}
+
+@Composable
+private fun KawaiiButton(
+    text: String,
+    onClick: () -> Unit,
+    outline: Boolean = false,
+    isLoading: Boolean = false
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp),
+        shape = RoundedCornerShape(25.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (outline) Color.Transparent else KawaiiBlue,
+            contentColor = if (outline) KawaiiBlue else Color.White
+        ),
+        border = if (outline) androidx.compose.foundation.BorderStroke(1.dp, KawaiiBlue) else null,
+        enabled = !isLoading
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(color = if (outline) KawaiiBlue else Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Text(text = text, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = PurpleLight)
-            Text("  o  ", color = TextSecondary, fontSize = 13.sp)
-            HorizontalDivider(modifier = Modifier.weight(1f), color = PurpleLight)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedButton(
-            onClick = { loginWithGoogle() },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            border = ButtonDefaults.outlinedButtonBorder
-        ) {
-            Text("🔵  Continuar con Google", fontSize = 15.sp, color = TextPrimary)
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
     }
 }
