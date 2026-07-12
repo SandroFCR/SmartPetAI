@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -113,6 +116,12 @@ fun StudySessionScreen(
     
     var selectedSoundUri by remember { mutableStateOf<Uri?>(null) }
     var selectedSoundName by remember { mutableStateOf("Predeterminado") }
+    
+    var showAppBlockerDialog by remember { mutableStateOf(false) }
+    var installedApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
+    var blockedPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var hasUsagePermission by remember { mutableStateOf(false) }
+    var hasOverlayPermission by remember { mutableStateOf(false) }
 
     LaunchedEffect(serviceTimeLeft, serviceIsRunning, servicePhase) {
         if (isBound) {
@@ -161,6 +170,17 @@ fun StudySessionScreen(
             val ringtone = RingtoneManager.getRingtone(context, selectedSoundUri)
             selectedSoundName = ringtone?.getTitle(context) ?: "Alarma"
         }
+        
+        hasUsagePermission = AppBlockerManager.hasUsageStatsPermission(context)
+        hasOverlayPermission = AppBlockerManager.hasOverlayPermission(context)
+        
+        if (hasUsagePermission) {
+            installedApps = AppBlockerManager.getInstalledApps(context)
+            // By default, if blockedPackages is empty, block everything
+            if (blockedPackages.isEmpty()) {
+                blockedPackages = installedApps.map { it.packageName }.toSet()
+            }
+        }
     }
 
     fun startTimer(minutes: Int) {
@@ -169,6 +189,9 @@ fun StudySessionScreen(
             putExtra("MINUTES", minutes)
             putExtra("PHASE", if (phase == PomodoroPhase.BREAK) "BREAK" else "STUDY")
             putExtra("SOUND_URI", selectedSoundUri?.toString())
+            if (hasUsagePermission) {
+                putExtra("BLOCKED_APPS", blockedPackages.toTypedArray())
+            }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
@@ -186,8 +209,18 @@ fun StudySessionScreen(
     }
 
     fun stopTimer() {
-        context.startService(Intent(context, PomodoroService::class.java).apply { action = "STOP" })
+        if (phase == PomodoroPhase.STUDY) {
+            val totalElapsedMillis = (sessionDurationMinutes * 60 * 1000L) - timeLeft
+            val totalMinutes = (totalElapsedMillis / 60000).toInt()
+            if (totalMinutes > 0) {
+                onSessionFinished(totalMinutes)
+            }
+        }
+        context.stopService(Intent(context, PomodoroService::class.java))
         lastMinuteReported = 0
+        timeLeft = sessionDurationMinutes * 60 * 1000L
+        isRunning = false
+        phase = PomodoroPhase.STUDY
     }
 
     fun stopAlarmAndSwitch() {
@@ -243,18 +276,44 @@ fun StudySessionScreen(
                 fontFamily = FredokaFont,
                 color = themeColor
             )
-            IconButton(
-                onClick = {
-                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Selecciona Alarma")
-                        putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
-                    }
-                    soundLauncher.launch(intent)
-                }, 
-                modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
-            ) {
-                Icon(Icons.Default.MusicNote, contentDescription = "Música", tint = themeColor, modifier = Modifier.size(22.dp))
+            Row {
+                IconButton(
+                    onClick = { 
+                        if (!hasUsagePermission) {
+                            AppBlockerManager.openUsageStatsSettings(context)
+                        } else if (!hasOverlayPermission) {
+                            AppBlockerManager.openOverlaySettings(context)
+                        } else {
+                            if (installedApps.isEmpty()) {
+                                installedApps = AppBlockerManager.getInstalledApps(context)
+                                blockedPackages = installedApps.map { it.packageName }.toSet()
+                            }
+                            showAppBlockerDialog = true 
+                        }
+                    }, 
+                    modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(
+                        Icons.Default.NotificationsActive, 
+                        contentDescription = "Bloqueador", 
+                        tint = if (hasUsagePermission && hasOverlayPermission) themeColor else Color.Gray,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Selecciona Alarma")
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
+                        }
+                        soundLauncher.launch(intent)
+                    }, 
+                    modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(Icons.Default.MusicNote, contentDescription = "Música", tint = themeColor, modifier = Modifier.size(22.dp))
+                }
             }
         }
 
@@ -475,7 +534,7 @@ fun StudySessionScreen(
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Surface(
-                        onClick = { stopTimer() },
+                        onClick = { stopTimer(); onBack() },
                         modifier = Modifier.size(68.dp),
                         shape = RoundedCornerShape(22.dp),
                         color = Color(0xFFFFE0E0)
@@ -493,5 +552,61 @@ fun StudySessionScreen(
                 }
             }
         }
+    }
+
+    if (showAppBlockerDialog) {
+        AlertDialog(
+            onDismissRequest = { showAppBlockerDialog = false },
+            title = { Text("Selecciona aplicaciones a BLOQUEAR", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Box(modifier = Modifier.height(400.dp)) {
+                    LazyColumn {
+                        items(installedApps) { app: AppInfo ->
+                            val isBlocked = blockedPackages.contains(app.packageName)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        blockedPackages = if (isBlocked) {
+                                            blockedPackages - app.packageName
+                                        } else {
+                                            blockedPackages + app.packageName
+                                        }
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isBlocked,
+                                    onCheckedChange = { checked ->
+                                        blockedPackages = if (checked == true) {
+                                            blockedPackages + app.packageName
+                                        } else {
+                                            blockedPackages - app.packageName
+                                        }
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                // App Icon using Coil
+                                coil3.compose.AsyncImage(
+                                    model = app.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text = app.label, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showAppBlockerDialog = false }) {
+                    Text("Aceptar")
+                }
+            },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = White
+        )
     }
 }

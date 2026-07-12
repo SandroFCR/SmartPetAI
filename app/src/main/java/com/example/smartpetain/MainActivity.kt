@@ -97,6 +97,13 @@ class MainActivity : ComponentActivity() {
                             isLoggedIn = false
                         }
                     )
+                    
+                    // Simple Toast or feedback when brought to front by blocker
+                    LaunchedEffect(intent) {
+                        if (intent?.getBooleanExtra("BLOCKED_TRIGGER", false) == true) {
+                            // Focus enforced!
+                        }
+                    }
                 } else {
                     AuthScreen(onAuthSuccess = { isLoggedIn = true })
                 }
@@ -465,7 +472,7 @@ fun DashboardScreen(
                     icon = Icons.Filled.Schedule,
                     iconTint = DashboardBluePrimary,
                     iconBackground = DashboardBlueLight,
-                    label = "Tiempo estudiado hoy",
+                    label = "Tiempo total estudiado",
                     value = studiedText,
                     footer = "estudiado hoy",
                     compact = compact

@@ -26,6 +26,8 @@ class PomodoroService : Service() {
     val phase: StateFlow<String> = _phase
 
     private var currentSoundUri: Uri? = null
+    private var blockedPackages: Set<String> = emptySet()
+    private var isBlockerActive: Boolean = false
 
     inner class PomodoroBinder : Binder() {
         fun getService(): PomodoroService = this@PomodoroService
@@ -39,7 +41,12 @@ class PomodoroService : Service() {
                 val minutes = intent.getIntExtra("MINUTES", 25)
                 val phaseStr = intent.getStringExtra("PHASE") ?: "STUDY"
                 val soundUriStr = intent.getStringExtra("SOUND_URI")
+                val blocked = intent.getStringArrayExtra("BLOCKED_APPS")?.toSet() ?: emptySet()
+                
                 currentSoundUri = soundUriStr?.let { Uri.parse(it) }
+                blockedPackages = blocked
+                isBlockerActive = blocked.isNotEmpty() && phaseStr == "STUDY"
+                
                 startTimer(minutes, phaseStr)
             }
             "PAUSE" -> pauseTimer()
@@ -62,18 +69,41 @@ class PomodoroService : Service() {
 
     private fun runTimer(millis: Long) {
         timer?.cancel()
-        timer = object : CountDownTimer(millis, 1000) {
+        timer = object : CountDownTimer(millis, 500) { // Check every 500ms
             override fun onTick(millisUntilFinished: Long) {
                 _timeLeft.value = millisUntilFinished
                 updateNotification(millisUntilFinished)
+                checkForegroundApp()
             }
 
             override fun onFinish() {
                 _timeLeft.value = 0
                 _isRunning.value = false
+                isBlockerActive = false
                 handleTimerFinished()
             }
         }.start()
+    }
+
+    private fun checkForegroundApp() {
+        if (!isBlockerActive || _phase.value != "STUDY") return
+        
+        val foregroundApp = AppBlockerManager.getForegroundApp(this)
+        val myPackage = packageName
+        
+        // Only pull back if:
+        // 1. We detected a foreground app
+        // 2. It's NOT our own app
+        // 3. It IS in the blocked list
+        if (foregroundApp != null && foregroundApp != myPackage && blockedPackages.contains(foregroundApp)) {
+            // Blocked app detected! Bring our app to front
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra("BLOCKED_TRIGGER", true)
+            }
+            startActivity(intent)
+        }
     }
 
     private fun handleTimerFinished() {
