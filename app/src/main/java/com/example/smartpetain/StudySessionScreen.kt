@@ -216,7 +216,7 @@ fun StudySessionScreen(
                 onSessionFinished(totalMinutes)
             }
         }
-        context.stopService(Intent(context, PomodoroService::class.java))
+        context.startService(Intent(context, PomodoroService::class.java).apply { action = "STOP" })
         lastMinuteReported = 0
         timeLeft = sessionDurationMinutes * 60 * 1000L
         isRunning = false

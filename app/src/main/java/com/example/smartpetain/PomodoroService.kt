@@ -51,8 +51,19 @@ class PomodoroService : Service() {
             }
             "PAUSE" -> pauseTimer()
             "RESUME" -> resumeTimer()
-            "STOP" -> stopTimer()
-            "STOP_ALARM" -> SmartPetNotificationManager.stopSound()
+            "STOP" -> {
+                isBlockerActive = false
+                blockedPackages = emptySet()
+                pauseTimer()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                nm.cancel(2001) // Explicitly cancel the timer notification
+                stopSelf()
+            }
+            "STOP_ALARM" -> {
+                isBlockerActive = false
+                SmartPetNotificationManager.stopSound()
+            }
         }
         return START_STICKY
     }
@@ -123,13 +134,6 @@ class PomodoroService : Service() {
     private fun resumeTimer() {
         _isRunning.value = true
         runTimer(_timeLeft.value)
-    }
-
-    private fun stopTimer() {
-        timer?.cancel()
-        _isRunning.value = false
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
     }
 
     private fun createNotification(millis: Long) {
