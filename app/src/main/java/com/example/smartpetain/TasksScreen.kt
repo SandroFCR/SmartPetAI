@@ -59,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartpetain.ui.theme.AmberLight
@@ -147,9 +148,9 @@ fun TasksScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(if (isDark) MaterialTheme.colorScheme.background else petThemeColor)
-            .padding(20.dp)
+            .padding(horizontal = 20.dp)
     ) {
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -171,28 +172,21 @@ fun TasksScreen(
         }
 
         Text(
-            text = "    Mis tareas  ",
-            fontSize = 46.sp,
+            text = "    Mis tareas",
+            fontSize = 32.sp, // Reduced font size for better space
             fontWeight = FontWeight.Bold,
             color = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
             modifier = Modifier.padding(start = 8.dp)
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
+        // Compact Mascot Box
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(170.dp)
+                .height(120.dp) // Reduced height from 170
         ) {
-            Icon(
-                imageVector = Icons.Filled.StarBorder,
-                contentDescription = null,
-                tint = petAccentColor.copy(alpha = 0.55f),
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .offset(y = 10.dp)
-            )
             Image(
                 painter = painterResource(id = when(equippedPet) {
                     "Pompompurin" -> R.drawable.pompompurin
@@ -202,57 +196,48 @@ fun TasksScreen(
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .size(width = 178.dp, height = 166.dp)
+                    .size(width = 120.dp, height = 110.dp) // Reduced size
                     .align(Alignment.BottomStart)
-                    .offset(x = (-16).dp, y = 8.dp)
+                    .offset(x = (-8).dp, y = 4.dp)
             )
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 142.dp, top = 34.dp),
-                shape = RoundedCornerShape(24.dp),
+                    .padding(start = 100.dp, top = 24.dp), // Adjusted for smaller mascot
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "Organicemos tu dia!",
-                        fontSize = 16.sp,
+                        text = "Organicemos tu día!",
+                        fontSize = 14.sp,
                         color = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Tu puedes con todo.",
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(top = 6.dp)
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
             }
-            Icon(
-                imageVector = Icons.Filled.StarBorder,
-                contentDescription = null,
-                tint = petAccentColor.copy(alpha = 0.5f),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(y = 8.dp)
-                    .size(18.dp)
-            )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
+        // Compact Tabs
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(26.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 TaskTabChip(
                     text = "Pendientes",
@@ -275,8 +260,9 @@ fun TasksScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
+        // Compact Sorting Chips
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
@@ -289,22 +275,22 @@ fun TasksScreen(
                 val isSelected = sortBy == key
                 Surface(
                     onClick = { sortBy = key },
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = if (isSelected) (if (isDark) MaterialTheme.colorScheme.primary else petAccentColor) else MaterialTheme.colorScheme.surface
                 ) {
                     Text(
                         text = label,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = if (isSelected) White else (if (isDark) MaterialTheme.colorScheme.onSurface else petAccentColor),
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (sortedTasks.isEmpty()) {
             Box(
@@ -326,7 +312,7 @@ fun TasksScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp) // Reduced spacing
             ) {
                 items(sortedTasks) { task ->
                     TaskItem(
@@ -358,14 +344,14 @@ fun TasksScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Button(
             onClick = { showDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
-            shape = RoundedCornerShape(32.dp),
+                .height(56.dp), // Reduced height from 64
+            shape = RoundedCornerShape(28.dp),
             colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
         ) {
             Surface(shape = RoundedCornerShape(50.dp), color = if (isDark) MaterialTheme.colorScheme.surface else White) {
@@ -373,17 +359,18 @@ fun TasksScreen(
                     imageVector = Icons.Filled.Add,
                     contentDescription = null,
                     tint = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier.padding(6.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = "Agregar tarea",
-                fontSize = 22.sp,
+                fontSize = 18.sp,
                 color = if (isDark) White else petTextColor,
                 fontWeight = FontWeight.Bold
             )
         }
+        Spacer(modifier = Modifier.height(8.dp))
     }
 
     if (showDialog) {
@@ -425,13 +412,13 @@ fun TasksScreen(
                         text = "Nueva tarea",
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) MaterialTheme.colorScheme.onSurface else petTextColor,
-                        fontSize = 26.sp
+                        fontSize = 24.sp
                     )
                 }
             },
             text = {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     OutlinedTextField(
@@ -462,10 +449,10 @@ fun TasksScreen(
                         trailingIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 TextButton(onClick = { showDatePicker = true }) {
-                                    Text("Fecha", fontSize = 12.sp)
+                                    Text("Fecha", fontSize = 11.sp)
                                 }
                                 TextButton(onClick = { showTimePicker = true }) {
-                                    Text("Hora", fontSize = 12.sp)
+                                    Text("Hora", fontSize = 11.sp)
                                 }
                             }
                         },
@@ -473,7 +460,7 @@ fun TasksScreen(
                     )
                     Text(
                         text = "Prioridad",
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         color = TextSecondary,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
@@ -500,13 +487,13 @@ fun TasksScreen(
                             ) {
                                 Text(
                                     text = priority,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     color = textColor,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
                     }
                 }
@@ -613,31 +600,31 @@ private fun TaskTabChip(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp), // More compact
         color = if (selected) (if (isDark) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else petThemeColor.copy(alpha = 0.8f)) else Color.Transparent
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = if (text == "Pendientes") "📋 $text" else "✓ $text",
-                fontSize = 15.sp,
+                fontSize = 13.sp, // Reduced font
                 color = if (selected) (if (isDark) MaterialTheme.colorScheme.primary else petTextColor) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Surface(
                 shape = RoundedCornerShape(50.dp),
                 color = if (text == "Pendientes") PinkPrimary else TealPrimary
             ) {
                 Text(
                     text = count.toString(),
-                    fontSize = 13.sp,
+                    fontSize = 11.sp, // Reduced font
                     color = White,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
         }
@@ -660,7 +647,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(18.dp), // More compact corners
         colors = CardDefaults.cardColors(
             containerColor = if (task.isCompleted) (if (isDark) Color(0xFF1B2B1B) else Color(0xFFF5FFF0)) else MaterialTheme.colorScheme.surface
         ),
@@ -669,7 +656,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(12.dp), // Reduced padding from 18
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
@@ -678,7 +665,8 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                 colors = CheckboxDefaults.colors(
                     checkedColor = TealPrimary,
                     uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                )
+                ),
+                modifier = Modifier.size(24.dp)
             )
             Column(
                 modifier = Modifier
@@ -687,54 +675,64 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
             ) {
                 Text(
                     text = task.name,
-                    fontSize = 18.sp,
+                    fontSize = 16.sp, // Reduced from 18
                     fontWeight = FontWeight.Bold,
                     color = if (task.isCompleted) TealPrimary else MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(text = task.subject, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                    Surface(shape = RoundedCornerShape(10.dp), color = if (isDark) priorityBg.copy(alpha = 0.2f) else priorityBg) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = task.subject, 
+                        fontSize = 11.sp, 
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Surface(shape = RoundedCornerShape(8.dp), color = if (isDark) priorityBg.copy(alpha = 0.2f) else priorityBg) {
                         Text(
                             text = task.priority,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = priorityColor,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                         )
                     }
                 }
                 if (task.dueDate.isNotBlank()) {
                     Text(
                         text = task.dueDate,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 1.dp)
                     )
                 }
             }
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(14.dp),
                 color = if (isDark) priorityBg.copy(alpha = 0.2f) else priorityBg,
-                modifier = Modifier.size(58.dp)
+                modifier = Modifier.size(44.dp) // Reduced from 58
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = task.emoji.ifBlank { defaultTaskEmoji(task.priority) },
-                        fontSize = 28.sp
+                        fontSize = 20.sp // Reduced from 28
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(4.dp))
             IconButton(
                 onClick = { onDelete(task) },
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.DeleteOutline,
                     contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
