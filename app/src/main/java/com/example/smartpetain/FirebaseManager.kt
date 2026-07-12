@@ -17,7 +17,8 @@ data class UserProfile(
     val pomodoroDuration: Int = 25,
     val avatarUrl: String? = null,
     val equippedPet: String = "Cinnamoroll",
-    val alarmSoundUri: String? = null
+    val alarmSoundUri: String? = null,
+    val weeklyGoalMinutes: Int = 1050 // Default 25*7*6 if we assume something, or maybe just 1050 (17.5h)
 )
 
 data class StudySessionRecord(
@@ -408,7 +409,8 @@ object FirebaseManager {
                         "pomodoroDuration" to profile.pomodoroDuration,
                         "avatarUrl" to profile.avatarUrl,
                         "equippedPet" to profile.equippedPet,
-                        "alarmSoundUri" to profile.alarmSoundUri
+                        "alarmSoundUri" to profile.alarmSoundUri,
+                        "weeklyGoalMinutes" to profile.weeklyGoalMinutes
                     ),
                     SetOptions.merge()
                 )
@@ -437,6 +439,22 @@ object FirebaseManager {
                 .document("data")
                 .set(
                     hashMapOf("pomodoroDuration" to pomodoroDuration),
+                    SetOptions.merge()
+                )
+                .await()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    suspend fun saveWeeklyGoal(minutes: Int) {
+        try {
+            db.collection("users")
+                .document(userId)
+                .collection("profile")
+                .document("data")
+                .set(
+                    hashMapOf("weeklyGoalMinutes" to minutes),
                     SetOptions.merge()
                 )
                 .await()
@@ -474,7 +492,8 @@ object FirebaseManager {
                 pomodoroDuration = doc.getLong("pomodoroDuration")?.toInt() ?: 25,
                 avatarUrl = doc.getString("avatarUrl"),
                 equippedPet = doc.getString("equippedPet") ?: "Cinnamoroll",
-                alarmSoundUri = doc.getString("alarmSoundUri")
+                alarmSoundUri = doc.getString("alarmSoundUri"),
+                weeklyGoalMinutes = doc.getLong("weeklyGoalMinutes")?.toInt() ?: 1050
             )
         } catch (e: Exception) {
             UserProfile()

@@ -2,6 +2,7 @@ package com.example.smartpetain
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +19,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.smartpetain.ui.theme.Background
 import com.example.smartpetain.ui.theme.PurpleLight
 import com.example.smartpetain.ui.theme.PurplePrimary
 import com.example.smartpetain.ui.theme.TealPrimary
@@ -47,6 +54,7 @@ import com.example.smartpetain.ui.theme.TextSecondary
 import com.example.smartpetain.ui.theme.White
 import java.util.Calendar
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 data class DayStats(
     val day: String,
@@ -65,19 +73,21 @@ fun StatsScreen(
     totalStudyMinutes: Int = 0,
     equippedPetName: String = "Cinnamoroll"
 ) {
+    val scope = rememberCoroutineScope()
     var weekStats by remember { mutableStateOf(emptyWeekStats()) }
-    var dailyGoalMinutes by remember { mutableStateOf(25) }
+    var weeklyGoalMinutes by remember { mutableStateOf(1050) }
     var summary by remember { mutableStateOf(PomodoroStatsSummary()) }
     var isLoading by remember { mutableStateOf(true) }
+    var showInHours by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        dailyGoalMinutes = FirebaseManager.loadProfile().pomodoroDuration
+        val profile = FirebaseManager.loadProfile()
+        weeklyGoalMinutes = profile.weeklyGoalMinutes
         weekStats = FirebaseManager.loadWeekStats()
         summary = FirebaseManager.loadPomodoroStatsSummary()
         isLoading = false
     }
 
-    // Theme based on mascot
     val themeColor = when (equippedPetName) {
         "Pompompurin" -> Color(0xFFE8A900)
         "Hello Kitty" -> Color(0xFFD4537E)
@@ -91,12 +101,13 @@ fun StatsScreen(
     }
 
     val maxMinutes = weekStats.maxOf { it.minutes }.coerceAtLeast(1)
-    val totalWeek = weekStats.sumOf { it.minutes }
+    val totalWeekMinutes = weekStats.sumOf { it.minutes }
     val totalTrackedStudy = summary.totalStudyMinutes.takeIf { it > 0 } ?: totalStudyMinutes
-    val avgMinutes = totalWeek / 7
-    val weeklyGoalMinutes = (dailyGoalMinutes * 7).coerceAtLeast(1)
-    val effectiveMinutes = weekStats.sumOf { it.minutes.coerceAtMost(dailyGoalMinutes) }
+    
+    // Calculate productivity based on the fixed weekly goal
+    val effectiveMinutes = weekStats.sumOf { it.minutes }
     val productivity = ((effectiveMinutes / weeklyGoalMinutes.toFloat()) * 100).toInt().coerceIn(0, 100)
+    
     val productivityLabel = when {
         productivity >= 80 -> "Excelente"
         productivity >= 50 -> "Buen avance"
@@ -135,13 +146,21 @@ fun StatsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        WeeklyGoalCard(
+        // Updated Weekly Goal Card with decoupled logic and Unit Switch
+        WeeklyGoalEditorCard(
             effectiveMinutes = effectiveMinutes,
             weeklyGoalMinutes = weeklyGoalMinutes,
-            dailyGoalMinutes = dailyGoalMinutes,
             productivity = productivity,
             productivityLabel = productivityLabel,
-            themeColor = themeColor
+            themeColor = themeColor,
+            showInHours = showInHours,
+            onUnitToggle = { showInHours = !showInHours },
+            onGoalChange = { newGoal ->
+                weeklyGoalMinutes = newGoal
+                scope.launch {
+                    FirebaseManager.saveWeeklyGoal(newGoal)
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -186,51 +205,30 @@ fun StatsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        MetricRow {
-            MetricCard(
-                imageRes = R.drawable.mejor_dia,
-                value = "${summary.monthPomodoros}",
-                title = "Este mes",
-                subtitle = "Pomodoros completos",
-                modifier = Modifier.weight(1f),
-                themeColor = themeColor
-            )
-            MetricCard(
-                imageRes = R.drawable.racha,
-                value = "${summary.bestProductivityStreak}",
-                title = "Mejor racha",
-                subtitle = "dias productivos",
-                modifier = Modifier.weight(1f),
-                themeColor = themeColor
-            )
-        }
-
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.1f)),
-            elevation = CardDefaults.cardElevation(0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "Analisis Pomodoro",
+                    text = "Análisis de Productividad",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = themeColor
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = weeklyStudyMessage(totalWeek, avgMinutes, dailyGoalMinutes),
+                    text = weeklyStudyMessage(totalWeekMinutes, weeklyGoalMinutes),
                     fontSize = 14.sp,
                     color = TextPrimary
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Productividad semanal: $productivity% ($productivityLabel)",
+                    text = "Progreso de meta: $productivity% ($productivityLabel)",
                     fontSize = 13.sp,
                     color = themeColor,
                     fontWeight = FontWeight.Bold
@@ -259,7 +257,7 @@ private fun PomodoroStatsHero(themeColor: Color) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Estadisticas Pomodoro",
+                    text = "Estadísticas de Estudio",
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
@@ -267,7 +265,7 @@ private fun PomodoroStatsHero(themeColor: Color) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "Tus sesiones y descansos se registran al completar el temporizador.",
+                    text = "Seguimiento de tus metas semanales personalizadas.",
                     fontSize = 13.sp,
                     color = TextSecondary,
                     modifier = Modifier.padding(top = 6.dp)
@@ -278,18 +276,9 @@ private fun PomodoroStatsHero(themeColor: Color) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.pompompurin),
-                    contentDescription = "Pompompurin",
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(50.dp)
-                )
-                Image(
                     painter = painterResource(id = R.drawable.cinnamoroll),
                     contentDescription = "Cinnamoroll",
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .size(76.dp)
+                    modifier = Modifier.size(76.dp)
                 )
             }
         }
@@ -324,37 +313,23 @@ private fun StudyTimeCard(
                 color = TextPrimary,
                 modifier = Modifier.padding(top = 4.dp)
             )
-            Text(
-                text = if (totalTrackedStudy > 0) "Actualizado automaticamente desde el Pomodoro" else "Completa un Pomodoro para empezar",
-                fontSize = 13.sp,
-                color = themeColor,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
+            
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Minutos por dia",
+                text = "Minutos por día",
                 fontSize = 12.sp,
                 color = TextSecondary,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
             if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = themeColor)
                 }
             } else {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(138.dp),
+                    modifier = Modifier.fillMaxWidth().height(138.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Bottom
                 ) {
@@ -372,24 +347,16 @@ private fun StudyTimeCard(
                             modifier = Modifier.height(138.dp)
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .height(104.dp)
-                                    .width(32.dp),
+                                modifier = Modifier.height(104.dp).width(32.dp),
                                 contentAlignment = Alignment.BottomCenter
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     if (day.minutes > 0) {
-                                        Text(
-                                            text = "${day.minutes}",
-                                            fontSize = 9.sp,
-                                            color = TextSecondary
-                                        )
+                                        Text(text = "${day.minutes}", fontSize = 9.sp, color = TextSecondary)
                                         Spacer(modifier = Modifier.height(2.dp))
                                     }
                                     Box(
-                                        modifier = Modifier
-                                            .width(28.dp)
-                                            .height(barHeight)
+                                        modifier = Modifier.width(28.dp).height(barHeight)
                                             .background(
                                                 color = if (isToday) themeColor else themeColor.copy(alpha = 0.3f),
                                                 shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
@@ -413,13 +380,15 @@ private fun StudyTimeCard(
 }
 
 @Composable
-private fun WeeklyGoalCard(
+private fun WeeklyGoalEditorCard(
     effectiveMinutes: Int,
     weeklyGoalMinutes: Int,
-    dailyGoalMinutes: Int,
     productivity: Int,
     productivityLabel: String,
-    themeColor: Color
+    themeColor: Color,
+    showInHours: Boolean,
+    onUnitToggle: () -> Unit,
+    onGoalChange: (Int) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -428,29 +397,69 @@ private fun WeeklyGoalCard(
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Meta semanal",
-                fontSize = 13.sp,
-                color = TextSecondary
-            )
-            Text(
-                text = "${effectiveMinutes.coerceAtMost(weeklyGoalMinutes)} / $weeklyGoalMinutes min",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Meta Semanal",
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+                Surface(
+                    onClick = onUnitToggle,
+                    shape = RoundedCornerShape(12.dp),
+                    color = themeColor.copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = if (showInHours) "Ver en Minutos" else "Ver en Horas",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = themeColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = { if (weeklyGoalMinutes > 60) onGoalChange(weeklyGoalMinutes - 60) }) {
+                    Icon(Icons.Default.Remove, contentDescription = null, tint = themeColor)
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (showInHours) {
+                            String.format(Locale.getDefault(), "%.1f / %.0f h", effectiveMinutes / 60f, weeklyGoalMinutes / 60f)
+                        } else {
+                            "$effectiveMinutes / $weeklyGoalMinutes min"
+                        },
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+
+                IconButton(onClick = { onGoalChange(weeklyGoalMinutes + 60) }) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = themeColor)
+                }
+            }
+
             LinearProgressIndicator(
                 progress = { productivity / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth().height(8.dp).padding(top = 8.dp),
                 color = themeColor,
                 trackColor = themeColor.copy(alpha = 0.1f)
             )
+            
             Text(
-                text = "Objetivo diario: $dailyGoalMinutes min - $productivityLabel",
+                text = "Estado: $productivityLabel",
                 fontSize = 12.sp,
                 color = themeColor,
                 fontWeight = FontWeight.Bold,
@@ -479,9 +488,7 @@ private fun MetricCard(
     themeColor: Color
 ) {
     Card(
-        modifier = modifier
-            .heightIn(min = 132.dp)
-            .padding(0.dp),
+        modifier = modifier.heightIn(min = 132.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = White),
         elevation = CardDefaults.cardElevation(0.dp)
@@ -490,16 +497,10 @@ private fun MetricCard(
             Image(
                 painter = painterResource(id = imageRes),
                 contentDescription = title,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(46.dp)
+                modifier = Modifier.align(Alignment.TopEnd).size(46.dp)
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 28.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 28.dp)) {
                 Text(
                     text = value,
                     fontSize = 25.sp,
@@ -523,13 +524,8 @@ private fun MetricCard(
 
 private fun emptyWeekStats(): List<DayStats> {
     return listOf(
-        DayStats("Lun", 0),
-        DayStats("Mar", 0),
-        DayStats("Mie", 0),
-        DayStats("Jue", 0),
-        DayStats("Vie", 0),
-        DayStats("Sab", 0),
-        DayStats("Dom", 0)
+        DayStats("Lun", 0), DayStats("Mar", 0), DayStats("Mie", 0),
+        DayStats("Jue", 0), DayStats("Vie", 0), DayStats("Sab", 0), DayStats("Dom", 0)
     )
 }
 
@@ -551,14 +547,10 @@ private fun formatMinutes(totalMinutes: Int): String {
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
-private fun formatAverage(value: Double): String {
-    return if (value == 0.0) "0" else String.format(Locale.getDefault(), "%.1f", value)
-}
-
-private fun weeklyStudyMessage(totalWeek: Int, avgMinutes: Int, dailyGoalMinutes: Int): String {
+private fun weeklyStudyMessage(totalWeekMinutes: Int, weeklyGoalMinutes: Int): String {
     return when {
-        totalWeek == 0 -> "Completa una sesion Pomodoro para empezar a ver tus estadisticas reales."
-        avgMinutes >= dailyGoalMinutes -> "Buen ritmo: esta semana estas sosteniendo tu meta diaria de $dailyGoalMinutes minutos en promedio."
-        else -> "Ya empezaste. Intenta completar una sesion de $dailyGoalMinutes minutos para mejorar tu productividad semanal."
+        totalWeekMinutes == 0 -> "Comienza una sesión de estudio para ver tu progreso real."
+        totalWeekMinutes >= weeklyGoalMinutes -> "¡Increíble! Has superado tu meta semanal de estudio. ✨"
+        else -> "Llevas un buen ritmo. Te faltan ${formatMinutes(weeklyGoalMinutes - totalWeekMinutes)} para alcanzar tu objetivo semanal."
     }
 }

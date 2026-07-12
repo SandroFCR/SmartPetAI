@@ -204,6 +204,9 @@ fun AppNavigator(
                         character = activeCharacter.name,
                         updateDailyStats = false
                     )
+                    // Auto-equip Pompompurin for rest mode
+                    equippedPet = "Pompompurin"
+                    FirebaseManager.saveEquippedPet("Pompompurin")
                     refreshTrigger++
                 }
             },
@@ -276,6 +279,11 @@ fun AppNavigator(
                         scope.launch {
                             FirebaseManager.saveEquippedPet(petName)
                         }
+                        // If Pompompurin is equipped, automatically start a break session
+                        if (petName == "Pompompurin") {
+                            startSessionAsBreak = true
+                            currentScreen = "session"
+                        }
                     },
                     onMissionAction = { action ->
                         when (action) {
@@ -292,6 +300,10 @@ fun AppNavigator(
                                 }
                             }
                             "take_break" -> {
+                                equippedPet = "Pompompurin"
+                                scope.launch {
+                                    FirebaseManager.saveEquippedPet("Pompompurin")
+                                }
                                 startSessionAsBreak = true
                                 currentScreen = "session"
                             }
@@ -776,18 +788,6 @@ private fun DashboardMetricCard(
                     color = iconTint,
                     lineHeight = if (compact) 29.sp else 33.sp
                 )
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = iconBackground.copy(alpha = 0.88f)
-                ) {
-                    Text(
-                        text = footer,
-                        fontSize = if (compact) 10.sp else 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = iconTint,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
-                    )
-                }
             }
         }
     }
