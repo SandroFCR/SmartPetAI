@@ -16,7 +16,8 @@ data class UserProfile(
     val name: String = "Estudiante",
     val pomodoroDuration: Int = 25,
     val avatarUrl: String? = null,
-    val equippedPet: String = "Cinnamoroll"
+    val equippedPet: String = "Cinnamoroll",
+    val alarmSoundUri: String? = null
 )
 
 data class StudySessionRecord(
@@ -408,7 +409,8 @@ object FirebaseManager {
                         "name" to profile.name,
                         "pomodoroDuration" to profile.pomodoroDuration,
                         "avatarUrl" to profile.avatarUrl,
-                        "equippedPet" to profile.equippedPet
+                        "equippedPet" to profile.equippedPet,
+                        "alarmSoundUri" to profile.alarmSoundUri
                     ),
                     SetOptions.merge()
                 )
@@ -473,7 +475,8 @@ object FirebaseManager {
                 name = doc.getString("name") ?: "Estudiante",
                 pomodoroDuration = doc.getLong("pomodoroDuration")?.toInt() ?: 25,
                 avatarUrl = doc.getString("avatarUrl"),
-                equippedPet = doc.getString("equippedPet") ?: "Cinnamoroll"
+                equippedPet = doc.getString("equippedPet") ?: "Cinnamoroll",
+                alarmSoundUri = doc.getString("alarmSoundUri")
             )
         } catch (e: Exception) {
             UserProfile()

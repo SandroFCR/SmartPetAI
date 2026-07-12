@@ -1,14 +1,14 @@
 package com.example.smartpetain
 
 import android.Manifest
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -17,10 +17,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,14 +37,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smartpetain.ui.theme.FredokaFont
-import com.example.smartpetain.ui.theme.PurpleLight
-import com.example.smartpetain.ui.theme.PurplePrimary
 import com.example.smartpetain.ui.theme.White
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private enum class PomodoroPhase {
     STUDY,
@@ -62,6 +60,8 @@ fun StudySessionScreen(
     onSessionFinished: (Int) -> Unit = {},
     onBreakFinished: (Int) -> Unit = {}
 ) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val breakDurationSeconds = 5 * 60
     val studyDurationSeconds = sessionDurationMinutes * 60
     
@@ -73,30 +73,55 @@ fun StudySessionScreen(
     var sessionTime by remember { mutableStateOf(0) }
     var lastMinuteReported by remember { mutableStateOf(0) }
     
-    val context = LocalContext.current
+    var showSoundPicker by remember { mutableStateOf(false) }
+    var selectedSoundUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedSoundName by remember { mutableStateOf("Predeterminado") }
+
     val totalSeconds = if (phase == PomodoroPhase.STUDY) studyDurationSeconds else breakDurationSeconds
     val progress = timeLeft / totalSeconds.toFloat()
 
-    // Theme based on mascot (consistency with Dashboard)
+    // Theme based on mascot
     val themeColor = when (equippedPetName) {
         "Pompompurin" -> Color(0xFFE8A900)
         "Hello Kitty" -> Color(0xFFD4537E)
-        else -> Color(0xFF5DA9FF) // Cinnamoroll Blue
+        else -> Color(0xFF5DA9FF)
     }
     
     val themeBg = when (equippedPetName) {
         "Pompompurin" -> Color(0xFFFFF9C4)
         "Hello Kitty" -> Color(0xFFFCE4EC)
-        else -> Color(0xFFEAF7FF) // Light blue as in image_3
+        else -> Color(0xFFEAF7FF)
     }
 
     val permLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {}
 
+    val soundLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            selectedSoundUri = uri
+            val ringtone = RingtoneManager.getRingtone(context, uri)
+            selectedSoundName = ringtone?.getTitle(context) ?: "Silencio"
+            
+            scope.launch {
+                val profile = FirebaseManager.loadProfile()
+                FirebaseManager.saveProfile(profile.copy(alarmSoundUri = uri?.toString()))
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val profile = FirebaseManager.loadProfile()
+        profile.alarmSoundUri?.let {
+            selectedSoundUri = Uri.parse(it)
+            val ringtone = RingtoneManager.getRingtone(context, selectedSoundUri)
+            selectedSoundName = ringtone?.getTitle(context) ?: "Alarma"
         }
     }
 
@@ -118,14 +143,14 @@ fun StudySessionScreen(
             if (timeLeft == 0) {
                 if (phase == PomodoroPhase.STUDY) {
                     val studiedMinutes = sessionTime / 60
-                    SmartPetNotificationManager.sendBreakNotification(context)
+                    SmartPetNotificationManager.sendBreakNotification(context, selectedSoundUri)
                     onSessionFinished(studiedMinutes)
                     phase = PomodoroPhase.BREAK
                     timeLeft = breakDurationSeconds
                     sessionTime = 0
                     lastMinuteReported = 0
                 } else {
-                    SmartPetNotificationManager.sendStudyNotification(context)
+                    SmartPetNotificationManager.sendStudyNotification(context, selectedSoundUri)
                     onBreakFinished(5)
                     phase = PomodoroPhase.STUDY
                     timeLeft = studyDurationSeconds
@@ -145,7 +170,7 @@ fun StudySessionScreen(
             .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Bar with circular backgrounds for a clean look
+        // Top Bar
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -165,7 +190,14 @@ fun StudySessionScreen(
                 color = themeColor
             )
             IconButton(
-                onClick = { }, 
+                onClick = {
+                    val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Selecciona Alarma")
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, selectedSoundUri)
+                    }
+                    soundLauncher.launch(intent)
+                }, 
                 modifier = Modifier.size(46.dp).background(White.copy(alpha = 0.6f), CircleShape)
             ) {
                 Icon(Icons.Default.MusicNote, contentDescription = "Música", tint = themeColor, modifier = Modifier.size(22.dp))
@@ -180,7 +212,6 @@ fun StudySessionScreen(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Motivational Chip
             Surface(
                 shape = RoundedCornerShape(22.dp),
                 color = White.copy(alpha = 0.7f)
@@ -195,7 +226,6 @@ fun StudySessionScreen(
                 )
             }
             
-            // Duration adjustment buttons if not running
             if (!isRunning && phase == PomodoroPhase.STUDY && sessionTime == 0) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Surface(
@@ -219,9 +249,7 @@ fun StudySessionScreen(
             modifier = Modifier.size(320.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Circular Progress with dots effect
             Canvas(modifier = Modifier.size(280.dp)) {
-                // Outer dotted circle
                 drawCircle(
                     color = themeColor.copy(alpha = 0.2f),
                     style = Stroke(
@@ -229,8 +257,6 @@ fun StudySessionScreen(
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                     )
                 )
-                
-                // Active progress arc
                 val sweepAngle = 360f * progress
                 drawArc(
                     color = themeColor,
@@ -249,30 +275,27 @@ fun StudySessionScreen(
                     fontFamily = FredokaFont,
                     color = themeColor
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.productividad),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (phase == PomodoroPhase.STUDY) themeColor else Color.Gray
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (phase == PomodoroPhase.STUDY) "Enfoque" else "Descanso",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FredokaFont,
-                        color = themeColor.copy(alpha = 0.8f)
-                    )
-                }
+                Text(
+                    text = if (phase == PomodoroPhase.STUDY) "Enfoque" else "Descanso",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FredokaFont,
+                    color = themeColor.copy(alpha = 0.8f)
+                )
+                Text(
+                    text = "🔊 $selectedSoundName",
+                    fontSize = 10.sp,
+                    fontFamily = FredokaFont,
+                    color = themeColor.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
-            // Mascot Image
             val petRes = R.drawable.cinnamoroll_echado
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = 90.dp) // Adjusted for better framing
+                    .offset(y = 65.dp)
             ) {
                 Image(
                     painter = painterResource(id = petRes),
@@ -283,17 +306,16 @@ fun StudySessionScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(25.dp)) // Moved card up significantly
+        Spacer(modifier = Modifier.height(25.dp))
 
-        // Info Card with improved framing
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp) // Adjusted padding
+                .padding(horizontal = 16.dp)
                 .shadow(16.dp, RoundedCornerShape(28.dp), ambientColor = Color.LightGray.copy(alpha = 0.4f)),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = White),
-            elevation = CardDefaults.cardElevation(0.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 15.dp, vertical = 6.dp),
@@ -305,7 +327,7 @@ fun StudySessionScreen(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FredokaFont,
-                        color = Color(0xFF3B5998) // Darker blue for contrast as in image_2
+                        color = Color(0xFF3B5998)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -317,7 +339,6 @@ fun StudySessionScreen(
                     )
                 }
                 Spacer(modifier = Modifier.width(16.dp))
-                // Plant Icon (using productivity drawable as reference)
                 Image(
                     painter = painterResource(id = R.drawable.productividad),
                     contentDescription = null,
@@ -329,13 +350,11 @@ fun StudySessionScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Controls Area (Redesigned side squircle buttons and solid central circle)
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 36.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Pausar Button
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Surface(
                     onClick = { isRunning = !isRunning },
@@ -355,7 +374,6 @@ fun StudySessionScreen(
                 Text("Pausar", fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FredokaFont, color = themeColor, modifier = Modifier.padding(top = 8.dp))
             }
 
-            // Big Central Play/Pause
             Surface(
                 onClick = { isRunning = !isRunning },
                 modifier = Modifier.size(105.dp).shadow(14.dp, CircleShape),
@@ -372,7 +390,6 @@ fun StudySessionScreen(
                 }
             }
 
-            // Terminar Button
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Surface(
                     onClick = {
