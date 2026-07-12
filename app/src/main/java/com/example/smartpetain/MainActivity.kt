@@ -123,6 +123,7 @@ fun AppNavigator(
     var pendingTasks by remember { mutableStateOf(0) }
     var completedTasks by remember { mutableStateOf(0) }
     var pomodoroDuration by remember { mutableStateOf(25) }
+    var weeklyGoalMinutes by remember { mutableStateOf(1050) }
     var userName by remember { mutableStateOf("Estudiante") }
 
     // Gamificación y Mascotas
@@ -142,6 +143,7 @@ fun AppNavigator(
         val profile = FirebaseManager.loadProfile()
         userName = profile.name.ifBlank { "Estudiante" }
         pomodoroDuration = profile.pomodoroDuration
+        weeklyGoalMinutes = profile.weeklyGoalMinutes
         equippedPet = profile.equippedPet
         
         tasksList = FirebaseManager.loadTasks()
@@ -274,6 +276,7 @@ fun AppNavigator(
                     equippedPetName = equippedPet,
                     todayCompletedMissions = todayCompletedMissions,
                     dailyGoalMinutes = pomodoroDuration,
+                    weeklyGoalMinutes = weeklyGoalMinutes,
                     onEquipPet = { petName ->
                         equippedPet = petName
                         scope.launch {

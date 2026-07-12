@@ -606,6 +606,7 @@ object FirebaseManager {
     suspend fun generateStudyCoachRecommendation(
         weekStats: List<DayStats>,
         dailyGoalMinutes: Int,
+        weeklyGoalMinutes: Int,
         completedTasks: Int,
         pendingTasks: Int,
         pets: List<PetStats>,
@@ -614,6 +615,7 @@ object FirebaseManager {
         return try {
             val payload = hashMapOf(
                 "dailyGoalMinutes" to dailyGoalMinutes,
+                "weeklyGoalMinutes" to weeklyGoalMinutes,
                 "completedTasks" to completedTasks,
                 "pendingTasks" to pendingTasks,
                 "pets" to pets.map { pet ->

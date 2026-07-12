@@ -103,6 +103,7 @@ fun CharactersScreen(
     equippedPetName: String = "Cinnamoroll",
     todayCompletedMissions: List<Int> = emptyList(),
     dailyGoalMinutes: Int = 25,
+    weeklyGoalMinutes: Int = 1050,
     onEquipPet: (String) -> Unit = {},
     onMissionAction: (String) -> Unit = {}
 ) {
@@ -124,7 +125,7 @@ fun CharactersScreen(
         )
     }
 
-    LaunchedEffect(petStatsList, characters, dailyGoalMinutes) {
+    LaunchedEffect(petStatsList, characters, dailyGoalMinutes, weeklyGoalMinutes) {
         isCoachLoading = true
         val loadedWeekStats = FirebaseManager.loadWeekStats()
         weekStats = loadedWeekStats
@@ -132,15 +133,16 @@ fun CharactersScreen(
         val result = FirebaseManager.generateStudyCoachRecommendation(
             weekStats = loadedWeekStats,
             dailyGoalMinutes = dailyGoalMinutes,
+            weeklyGoalMinutes = weeklyGoalMinutes,
             completedTasks = completedTasks,
             pendingTasks = pendingTasks,
             pets = petStatsList,
             fallback = coachRecommendation
         )
         
-        // Sanitize all AI fields to be coherent and complete
+        // Final polish to avoid ANY hallucinated numbers or weird symbols
         coachRecommendation = result.copy(
-            title = finalizeAiMessage(result.title),
+            title = finalizeAiMessage(result.title, isTitle = true),
             message = finalizeAiMessage(result.message),
             reason = finalizeAiMessage(result.reason)
         )
@@ -205,7 +207,8 @@ fun CharactersScreen(
             characters = characters,
             themeColor = themeColor,
             weekStats = weekStats,
-            dailyGoalMinutes = dailyGoalMinutes
+            dailyGoalMinutes = dailyGoalMinutes,
+            weeklyGoalMinutes = weeklyGoalMinutes
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -227,16 +230,16 @@ private fun CoachRecommendationCard(
     characters: List<CharacterInfo>,
     themeColor: Color,
     weekStats: List<DayStats>,
-    dailyGoalMinutes: Int
+    dailyGoalMinutes: Int,
+    weeklyGoalMinutes: Int
 ) {
     val character = characters.find { it.name == recommendation.characterName } ?: characters.first()
     val cardColor = themeColor.copy(alpha = 0.1f)
     val accentColor = themeColor
 
     val safeDailyGoal = dailyGoalMinutes.coerceAtLeast(1)
-    val weeklyGoal = safeDailyGoal * 7
-    val effectiveMinutes = weekStats.sumOf { it.minutes.coerceAtMost(safeDailyGoal) }
-    val remainingWeeklyMinutes = (weeklyGoal - effectiveMinutes).coerceAtLeast(0)
+    val totalMinutesStudyThisWeek = weekStats.sumOf { it.minutes }
+    val remainingWeeklyMinutes = (weeklyGoalMinutes - totalMinutesStudyThisWeek).coerceAtLeast(0)
     val todayMinutes = weekStats.find { it.day == localDayLabel() }?.minutes ?: 0
     val remainingToday = (safeDailyGoal - todayMinutes).coerceAtLeast(0)
 
@@ -320,7 +323,7 @@ private fun CoachRecommendationCard(
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Text(
-                            text = "Semana: $effectiveMinutes/$weeklyGoal min ($remainingWeeklyMinutes rest.)",
+                            text = "Semana: $totalMinutesStudyThisWeek/$weeklyGoalMinutes min ($remainingWeeklyMinutes rest.)",
                             fontSize = 11.sp,
                             color = accentColor,
                             fontWeight = FontWeight.Bold
@@ -338,23 +341,42 @@ private fun CoachRecommendationCard(
     }
 }
 
-private fun finalizeAiMessage(rawMessage: String): String {
-    if (rawMessage.isBlank()) return "¡Sigue así! Vas por buen camino."
+private fun finalizeAiMessage(rawMessage: String, isTitle: Boolean = false): String {
+    if (rawMessage.isBlank()) return if (isTitle) "Plan de estudio" else "¡Sigue así! Vas por buen camino."
     
-    // 1. Remove redundant stats info aggressively
-    val statsSentences = listOf("vas", "minutos totales", "restante", "semana", "meta es", "faltan")
-    val paragraphs = rawMessage.trim().split("\n\n", "\n")
+    // 1. Remove non-Latin characters (like the Kanji '週' from your image)
+    var text = rawMessage.filter { it.code < 1000 }.trim()
     
-    val planParagraphs = paragraphs.filter { p ->
+    // Remove manual ellipsis from IA if it exists at the end
+    while(text.endsWith(".")) {
+        text = text.dropLast(1).trim()
+    }
+
+    // 2. ULTRA AGGRESSIVE STATS FILTER
+    val forbiddenKeywords = listOf(
+        "minutos", "faltan", "meta", "llegar a", "semana", "vas", "restante", "acumulados", "efectivos", "totales", "productividad"
+    )
+    
+    val paragraphs = text.split("\n\n", "\n")
+    val cleanParagraphs = paragraphs.filter { p ->
         val pLower = p.lowercase()
-        val statsCount = statsSentences.count { pLower.contains(it) }
-        statsCount < 2 || p.length > 50 
+        val hasNumbers = p.any { it.isDigit() }
+        val mentionsStats = forbiddenKeywords.any { pLower.contains(it) }
+        
+        if (isTitle) true else !(hasNumbers && mentionsStats)
     }
     
-    var text = planParagraphs.joinToString("\n\n").trim()
-    if (text.isBlank()) text = rawMessage.trim()
+    text = cleanParagraphs.joinToString("\n\n").trim()
+    
+    if (text.isBlank()) {
+        text = if (isTitle) {
+            "Tu plan personalizado"
+        } else {
+            paragraphs.firstOrNull { !it.any { c -> c.isDigit() } } ?: "¡Excelente avance! Sigue con este enfoque para lograr todas tus metas de hoy."
+        }
+    }
 
-    // 2. TRUNCATE AT LAST FULL STOP
+    // 3. TRUNCATE AT LAST FULL STOP (Ensure ideas are finished)
     val lastStop = text.lastIndexOf('.')
     val lastExclamation = text.lastIndexOf('!')
     val lastQuestion = text.lastIndexOf('?')
@@ -364,8 +386,8 @@ private fun finalizeAiMessage(rawMessage: String): String {
         text = text.substring(0, absoluteLastPunctuation + 1)
     }
 
-    // 3. Last resort cleanup of trailing conjunctions
-    val connectors = listOf(" y", " con", " para", " de", " que", ",", " así que", " además")
+    // 4. Conjunctions cleanup
+    val connectors = listOf(" y", " con", " para", " de", " que", ",", " así que", " además", " y además", ";", ":")
     var cleaned = text.trim()
     var changed = true
     while(changed) {
@@ -382,7 +404,7 @@ private fun finalizeAiMessage(rawMessage: String): String {
         cleaned += "."
     }
 
-    return cleaned.ifBlank { "Plan de hoy: Enfócate en tus tareas pendientes y completa una sesión de estudio." }
+    return cleaned
 }
 
 @Composable
