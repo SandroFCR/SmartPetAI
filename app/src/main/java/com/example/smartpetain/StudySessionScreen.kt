@@ -504,6 +504,19 @@ fun StudySessionScreen(
         Spacer(modifier = Modifier.weight(1f))
 
         if (phase != PomodoroPhase.ALARM) {
+            val pauseResumeBg = themeColor.copy(alpha = 0.15f)
+            val pauseResumeIcon = themeColor
+            val stopBg = when (equippedPetName) {
+                "Pompompurin" -> Color(0xFF5A1C05).copy(alpha = 0.1f)
+                "Hello Kitty" -> Color(0xFFD4537E).copy(alpha = 0.1f)
+                else -> Color(0xFF004A8F).copy(alpha = 0.1f)
+            }
+            val stopIcon = when (equippedPetName) {
+                "Pompompurin" -> Color(0xFF5A1C05)
+                "Hello Kitty" -> Color(0xFFD4537E)
+                else -> Color(0xFF004A8F)
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 36.dp),
                 horizontalArrangement = Arrangement.SpaceAround,
@@ -514,13 +527,13 @@ fun StudySessionScreen(
                         onClick = { if (isRunning) pauseTimer() else resumeTimer() },
                         modifier = Modifier.size(68.dp),
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xFFFFF9C4)
+                        color = pauseResumeBg
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                tint = Color(0xFFE8A900),
+                                tint = pauseResumeIcon,
                                 modifier = Modifier.size(32.dp)
                             )
                         }
@@ -549,13 +562,13 @@ fun StudySessionScreen(
                         onClick = { stopTimer(); onBack() },
                         modifier = Modifier.size(68.dp),
                         shape = RoundedCornerShape(22.dp),
-                        color = Color(0xFFFFE0E0)
+                        color = stopBg
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Stop,
                                 contentDescription = "Terminar",
-                                tint = Color(0xFFD4537E),
+                                tint = stopIcon,
                                 modifier = Modifier.size(32.dp)
                             )
                         }

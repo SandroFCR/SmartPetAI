@@ -34,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
@@ -434,7 +436,11 @@ fun TasksScreen(
             unfocusedBorderColor = dialogAccent.copy(alpha = 0.48f),
             focusedLabelColor = dialogAccent,
             unfocusedLabelColor = dialogAccent,
-            cursorColor = dialogAccent
+            cursorColor = dialogAccent,
+            focusedTextColor = dialogAccent,
+            unfocusedTextColor = dialogAccent,
+            focusedPlaceholderColor = dialogAccent.copy(alpha = 0.6f),
+            unfocusedPlaceholderColor = dialogAccent.copy(alpha = 0.6f)
         )
 
         AlertDialog(
@@ -475,31 +481,34 @@ fun TasksScreen(
                     OutlinedTextField(
                         value = newTaskTitle,
                         onValueChange = { newTaskTitle = it },
-                        label = { Text("Tarea", fontWeight = FontWeight.Bold) },
+                        placeholder = { Text("Tarea", fontWeight = FontWeight.Bold, color = dialogAccent.copy(alpha = 0.6f)) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = dialogAccent),
                         colors = taskFieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = newTaskSubject,
                         onValueChange = { newTaskSubject = it },
-                        label = { Text("Materia", color = dialogAccent, fontWeight = FontWeight.Bold) },
+                        placeholder = { Text("Materia", fontWeight = FontWeight.Bold, color = dialogAccent.copy(alpha = 0.6f)) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = dialogAccent),
                         colors = taskFieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = newTaskEmoji,
                         onValueChange = { newTaskEmoji = it.take(4) },
-                        label = { Text("Emoji") },
+                        placeholder = { Text("Emoji", fontWeight = FontWeight.Bold, color = dialogAccent.copy(alpha = 0.6f)) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = dialogAccent),
                         colors = taskFieldColors,
-                        placeholder = { Text("Ej: 📘") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = combinedDateTimeText,
                         onValueChange = { },
-                        label = { Text("Fecha y hora", color = dialogAccent, fontWeight = FontWeight.Bold) },
+                        placeholder = { Text("Fecha y hora", fontWeight = FontWeight.Bold, color = dialogAccent.copy(alpha = 0.6f)) },
                         readOnly = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = dialogAccent),
                         colors = taskFieldColors,
                         trailingIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -516,7 +525,8 @@ fun TasksScreen(
                     Text(
                         text = "Prioridad",
                         fontSize = 13.sp,
-                        color = TextSecondary,
+                        color = dialogAccent,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                     Row(
@@ -525,16 +535,31 @@ fun TasksScreen(
                     ) {
                         listOf("Alta", "Media", "Baja").forEach { priority ->
                             val isSelected = selectedPriority == priority
-                            val bgColor = when (priority) {
-                                "Alta" -> if (isSelected) PinkPrimary else PinkLight
-                                "Media" -> if (isSelected) AmberPrimary else AmberLight
-                                else -> if (isSelected) TealPrimary else TealLight
+                            
+                            val (bgColor, textColor) = when (equippedPet) {
+                                "Pompompurin" -> {
+                                    when (priority) {
+                                        "Alta" -> if (isSelected) Color(0xFF5A1C05) else Color(0xFFFFE0B2)
+                                        "Media" -> if (isSelected) Color(0xFFE8A900) else Color(0xFFFFF9C4)
+                                        else -> if (isSelected) Color(0xFFFFD54F) else Color(0xFFFFFDE7)
+                                    } to if (isSelected) White else Color(0xFF5A1C05)
+                                }
+                                "Hello Kitty" -> {
+                                    when (priority) {
+                                        "Alta" -> if (isSelected) Color(0xFFD4537E) else Color(0xFFFBEAF0)
+                                        "Media" -> if (isSelected) Color(0xFFFF8EB6) else Color(0xFFFFEBF2)
+                                        else -> if (isSelected) Color(0xFFFFC1D1) else Color(0xFFFFF0F5)
+                                    } to if (isSelected) White else Color(0xFFD4537E)
+                                }
+                                else -> { // Cinnamoroll / Default
+                                    when (priority) {
+                                        "Alta" -> if (isSelected) Color(0xFF004A8F) else Color(0xFFD0E4FF)
+                                        "Media" -> if (isSelected) Color(0xFF5DA9FF) else Color(0xFFEAF7FF)
+                                        else -> if (isSelected) Color(0xFFAED2FF) else Color(0xFFF5F9FF)
+                                    } to if (isSelected) White else Color(0xFF004A8F)
+                                }
                             }
-                            val textColor = when (priority) {
-                                "Alta" -> if (isSelected) White else PinkPrimary
-                                "Media" -> if (isSelected) White else AmberPrimary
-                                else -> if (isSelected) White else TealPrimary
-                            }
+
                             Surface(
                                 onClick = { selectedPriority = priority },
                                 shape = RoundedCornerShape(20.dp),
@@ -613,55 +638,111 @@ fun TasksScreen(
                     showDialog = false 
                     taskToEdit = null
                 }) {
-                    Text("Cancelar", color = if (equippedPet == "Pompompurin") Color(0xFFE8A900) else TextSecondary)
+                    Text("Cancelar", color = if (equippedPet == "Pompompurin") Color(0xFFE8A900) else TextSecondary, fontWeight = FontWeight.Bold)
                 }
             }
         )
 
         if (showDatePicker) {
+            val datePickerColors = DatePickerDefaults.colors(
+                containerColor = dialogBackground,
+                titleContentColor = dialogAccent,
+                headlineContentColor = dialogAccent,
+                weekdayContentColor = dialogAccent.copy(alpha = 0.8f),
+                subheadContentColor = dialogAccent,
+                navigationContentColor = dialogAccent,
+                yearContentColor = dialogAccent,
+                selectedDayContainerColor = dialogAccent,
+                selectedDayContentColor = White,
+                todayContentColor = dialogAccent,
+                todayDateBorderColor = dialogAccent
+            )
+
             DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
+                colors = DatePickerDefaults.colors(containerColor = dialogBackground),
                 confirmButton = {
                     Button(
                         onClick = { showDatePicker = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (equippedPet == "Pompompurin") Color(0xFFFFC400) else if (isDark) MaterialTheme.colorScheme.primary else petButtonColor
+                        )
                     ) {
-                        Text("Confirmar", color = if (isDark) White else petTextColor)
+                        Text(
+                            "Confirmar", 
+                            color = if (equippedPet == "Pompompurin") Color(0xFF5A1C05) else if (isDark) White else petTextColor, 
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showDatePicker = false }) {
-                        Text("Cancelar", color = TextSecondary)
+                        Text(
+                            "Cancelar", 
+                            color = if (equippedPet == "Pompompurin") Color(0xFFE8A900) else TextSecondary, 
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             ) {
-                DatePicker(state = datePickerState)
+                DatePicker(
+                    state = datePickerState,
+                    colors = datePickerColors
+                )
             }
         }
 
         if (showTimePicker) {
+            val timePickerColors = TimePickerDefaults.colors(
+                clockDialColor = dialogAccent.copy(alpha = 0.08f),
+                clockDialSelectedContentColor = White,
+                clockDialUnselectedContentColor = dialogAccent,
+                selectorColor = dialogAccent,
+                periodSelectorSelectedContainerColor = dialogAccent,
+                periodSelectorUnselectedContainerColor = Color.Transparent,
+                periodSelectorSelectedContentColor = White,
+                periodSelectorUnselectedContentColor = dialogAccent,
+                timeSelectorSelectedContainerColor = dialogAccent,
+                timeSelectorUnselectedContainerColor = dialogAccent.copy(alpha = 0.12f),
+                timeSelectorSelectedContentColor = White,
+                timeSelectorUnselectedContentColor = dialogAccent
+            )
+
             AlertDialog(
                 onDismissRequest = { showTimePicker = false },
                 confirmButton = {
                     Button(
                         onClick = { showTimePicker = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (equippedPet == "Pompompurin") Color(0xFFFFC400) else if (isDark) MaterialTheme.colorScheme.primary else petButtonColor
+                        )
                     ) {
-                        Text("Confirmar", color = if (isDark) White else petTextColor)
+                        Text(
+                            "Confirmar", 
+                            color = if (equippedPet == "Pompompurin") Color(0xFF5A1C05) else if (isDark) White else petTextColor, 
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showTimePicker = false }) {
-                        Text("Cancelar", color = TextSecondary)
+                        Text(
+                            "Cancelar", 
+                            color = if (equippedPet == "Pompompurin") Color(0xFFE8A900) else TextSecondary, 
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
-                containerColor = if (isDark) MaterialTheme.colorScheme.surface else Color(0xFFFFFBEE),
+                containerColor = dialogBackground,
                 text = {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        TimePicker(state = timePickerState)
+                        TimePicker(
+                            state = timePickerState,
+                            colors = timePickerColors
+                        )
                     }
                 }
             )
@@ -774,6 +855,7 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit, onE
                         text = task.subject, 
                         fontSize = 11.sp, 
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

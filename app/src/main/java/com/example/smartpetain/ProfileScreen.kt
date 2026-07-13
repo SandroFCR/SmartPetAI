@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -148,10 +149,11 @@ fun ProfileScreen(
 
         Text(
             text = "Perfil",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.ExtraBold,
             color = themeColor,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -277,13 +279,16 @@ fun ProfileScreen(
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = profile.name,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = themeColor,
+                    modifier = Modifier.weight(1f, fill = false),
+                    textAlign = TextAlign.Center
                 )
                 IconButton(onClick = {
                     tempName = profile.name
