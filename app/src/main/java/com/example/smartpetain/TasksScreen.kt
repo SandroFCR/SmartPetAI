@@ -39,6 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -413,6 +414,28 @@ fun TasksScreen(
 
         val selectedTimeText = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
         val combinedDateTimeText = if (selectedDateText.isNotBlank()) "$selectedDateText $selectedTimeText" else (taskToEdit?.dueDate ?: "Sin fecha")
+        val dialogAccent = if (isDark) MaterialTheme.colorScheme.primary else petAccentColor
+        val dialogBackground = if (isDark) {
+            MaterialTheme.colorScheme.surface
+        } else {
+            when (equippedPet) {
+                "Pompompurin" -> Color(0xFFFFF8D8)
+                "Hello Kitty" -> Color(0xFFFFF0F5)
+                else -> Color(0xFFF0F9FF)
+            }
+        }
+        val dialogMascot = when (equippedPet) {
+            "Pompompurin" -> R.drawable.task_pompompurin_header
+            "Hello Kitty" -> R.drawable.task_hello_kitty_header
+            else -> R.drawable.task_cinnamoroll_header
+        }
+        val taskFieldColors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = dialogAccent,
+            unfocusedBorderColor = dialogAccent.copy(alpha = 0.48f),
+            focusedLabelColor = dialogAccent,
+            unfocusedLabelColor = dialogAccent,
+            cursorColor = dialogAccent
+        )
 
         AlertDialog(
             onDismissRequest = { 
@@ -420,23 +443,21 @@ fun TasksScreen(
                 taskToEdit = null
             },
             shape = RoundedCornerShape(28.dp),
-            containerColor = if (isDark) MaterialTheme.colorScheme.surface else Color(0xFFFFFBEE),
+            containerColor = dialogBackground,
             title = {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (equippedPet == "Pompompurin") {
-                            Image(
-                                painter = painterResource(id = R.drawable.pompompurin), // Assuming this is the new image ID or similar
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .padding(bottom = 8.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
+                        Image(
+                            painter = painterResource(id = dialogMascot),
+                            contentDescription = equippedPet,
+                            modifier = Modifier
+                                .size(if (equippedPet == "Hello Kitty") 112.dp else 96.dp)
+                                .padding(bottom = 6.dp),
+                            contentScale = ContentScale.Fit
+                        )
                         Text(
                             text = if (taskToEdit != null) "Editar tarea" else "Nueva tarea",
                             fontWeight = FontWeight.Bold,
@@ -454,19 +475,22 @@ fun TasksScreen(
                     OutlinedTextField(
                         value = newTaskTitle,
                         onValueChange = { newTaskTitle = it },
-                        label = { Text("Tarea") },
+                        label = { Text("Tarea", fontWeight = FontWeight.Bold) },
+                        colors = taskFieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = newTaskSubject,
                         onValueChange = { newTaskSubject = it },
-                        label = { Text("Materia") },
+                        label = { Text("Materia", color = dialogAccent, fontWeight = FontWeight.Bold) },
+                        colors = taskFieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = newTaskEmoji,
                         onValueChange = { newTaskEmoji = it.take(4) },
                         label = { Text("Emoji") },
+                        colors = taskFieldColors,
                         placeholder = { Text("Ej: 📘") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -474,15 +498,16 @@ fun TasksScreen(
                     OutlinedTextField(
                         value = combinedDateTimeText,
                         onValueChange = { },
-                        label = { Text("Fecha y Hora") },
+                        label = { Text("Fecha y hora", color = dialogAccent, fontWeight = FontWeight.Bold) },
                         readOnly = true,
+                        colors = taskFieldColors,
                         trailingIcon = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 TextButton(onClick = { showDatePicker = true }) {
-                                    Text("Fecha", fontSize = 11.sp)
+                                    Text("Fecha", fontSize = 11.sp, color = dialogAccent, fontWeight = FontWeight.Bold)
                                 }
                                 TextButton(onClick = { showTimePicker = true }) {
-                                    Text("Hora", fontSize = 11.sp)
+                                    Text("Hora", fontSize = 11.sp, color = dialogAccent, fontWeight = FontWeight.Bold)
                                 }
                             }
                         },

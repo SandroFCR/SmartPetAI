@@ -47,9 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -122,14 +122,28 @@ fun ProfileScreen(
     val hours = totalStudyMinutes / 60
     val minutes = totalStudyMinutes % 60
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(themeBg)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        themeBg,
+                        themeBg.copy(alpha = 0.82f),
+                        White
+                    )
+                )
+            )
     ) {
+        ProfileBackgroundDecorations(themeColor)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
@@ -142,7 +156,28 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Box(contentAlignment = Alignment.Center) {
+        val frameResource = when (equippedPetName) {
+            "Pompompurin" -> R.drawable.profile_frame_pompompurin_transparent
+            "Hello Kitty" -> R.drawable.profile_frame_hello_kitty_transparent
+            else -> R.drawable.profile_frame_cinnamoroll_transparent
+        }
+
+        Box(
+            modifier = Modifier
+                .width(220.dp)
+                .height(160.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = frameResource),
+                contentDescription = "Marco de $equippedPetName",
+                modifier = Modifier
+                    .size(220.dp)
+                    .align(Alignment.TopCenter)
+                    .offset(x = 2.dp),
+                contentScale = ContentScale.FillBounds
+            )
+
             Box(contentAlignment = Alignment.BottomEnd) {
                 val avatarModifier = Modifier
                     .size(96.dp)
@@ -195,22 +230,6 @@ fun ProfileScreen(
                             tint = White
                         )
                     }
-                }
-            }
-
-            if (equippedPetName == "Cinnamoroll") {
-                val context = LocalContext.current
-                val marcoResId = context.resources.getIdentifier("cinnamoroll_marco", "drawable", context.packageName)
-                
-                if (marcoResId != 0) {
-                    Image(
-                        painter = painterResource(id = marcoResId),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(150.dp)
-                            .offset(y = (-12).dp), // Ajustado para que el Cinnamoroll del marco quede arriba
-                        contentScale = ContentScale.Fit
-                    )
                 }
             }
         }
@@ -388,6 +407,77 @@ fun ProfileScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProfileBackgroundDecorations(accentColor: Color) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = "✦",
+            color = accentColor.copy(alpha = 0.22f),
+            fontSize = 42.sp,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 42.dp, end = 26.dp)
+        )
+        Text(
+            text = "★",
+            color = Color(0xFFFFD96F).copy(alpha = 0.58f),
+            fontSize = 18.sp,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 116.dp, start = 20.dp)
+        )
+        Text(
+            text = "✦",
+            color = accentColor.copy(alpha = 0.18f),
+            fontSize = 24.sp,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 176.dp, end = 18.dp)
+        )
+        Text(
+            text = "✦",
+            color = White.copy(alpha = 0.86f),
+            fontSize = 30.sp,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 18.dp)
+        )
+        Text(
+            text = "♥",
+            color = Color(0xFFFF91AD).copy(alpha = 0.42f),
+            fontSize = 22.sp,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 20.dp, top = 96.dp)
+        )
+        Text(
+            text = "★",
+            color = White.copy(alpha = 0.82f),
+            fontSize = 16.sp,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 42.dp, top = 150.dp)
+        )
+        Text(
+            text = "♥",
+            color = accentColor.copy(alpha = 0.18f),
+            fontSize = 34.sp,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 26.dp, bottom = 92.dp)
+        )
+        Text(
+            text = "✦",
+            color = accentColor.copy(alpha = 0.14f),
+            fontSize = 56.sp,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 18.dp, bottom = 156.dp)
+        )
     }
 }

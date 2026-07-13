@@ -412,20 +412,27 @@ fun StudySessionScreen(
             }
 
             val petRes = when (equippedPetName) {
-                "Pompompurin" -> R.drawable.pompompurin
-                "Hello Kitty" -> R.drawable.hello_kitty
+                "Pompompurin" -> R.drawable.study_pompompurin_cloud
+                "Hello Kitty" -> R.drawable.study_hello_kitty_cloud
                 else -> R.drawable.cinnamoroll_echado
             }
-            
+
+            val usesCloudIllustration = equippedPetName == "Pompompurin" ||
+                equippedPetName == "Hello Kitty"
+
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = if (equippedPetName == "Pompompurin") 65.dp else 90.dp)
+                    .offset(y = if (usesCloudIllustration) 18.dp else 90.dp)
             ) {
                 Image(
                     painter = painterResource(id = petRes),
                     contentDescription = equippedPetName,
-                    modifier = Modifier.size(if (equippedPetName == "Pompompurin") 200.dp else 240.dp),
+                    modifier = if (usesCloudIllustration) {
+                        Modifier.size(width = 372.dp, height = 186.dp)
+                    } else {
+                        Modifier.size(240.dp)
+                    },
                     contentScale = ContentScale.Fit
                 )
             }
