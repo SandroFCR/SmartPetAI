@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -125,11 +127,13 @@ fun TasksScreen(
     }
 
     var showDialog by remember { mutableStateOf(initialOpenAddDialog) }
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
     var sortBy by remember { mutableStateOf(initialSortBy.ifBlank { "none" }) }
     var selectedTab by remember { mutableStateOf("pending") }
-    var newTaskTitle by remember { mutableStateOf("") }
-    var newTaskSubject by remember { mutableStateOf("") }
-    var newTaskEmoji by remember { mutableStateOf("") }
+    var newTaskTitle by remember(taskToEdit) { mutableStateOf(taskToEdit?.name ?: "") }
+    var newTaskSubject by remember(taskToEdit) { mutableStateOf(taskToEdit?.subject ?: "") }
+    var newTaskEmoji by remember(taskToEdit) { mutableStateOf(taskToEdit?.emoji ?: "") }
+    var selectedPriority by remember(taskToEdit) { mutableStateOf(taskToEdit?.priority ?: "Media") }
 
     val completedCount = tasks.count { it.isCompleted }
     val pendingCount = tasks.count { !it.isCompleted }
@@ -172,11 +176,14 @@ fun TasksScreen(
         }
 
         Text(
-            text = "    Mis tareas",
-            fontSize = 32.sp, // Reduced font size for better space
+            text = "Mis tareas",
+            fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             color = if (isDark) MaterialTheme.colorScheme.primary else petTextColor,
-            modifier = Modifier.padding(start = 8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -203,7 +210,7 @@ fun TasksScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 100.dp, top = 24.dp), // Adjusted for smaller mascot
+                    .padding(start = 125.dp, top = 24.dp), // Increased start padding to not cover ear
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
@@ -246,7 +253,8 @@ fun TasksScreen(
                     modifier = Modifier.weight(1f),
                     onClick = { selectedTab = "pending" },
                     petThemeColor = petThemeColor,
-                    petTextColor = petTextColor
+                    petTextColor = petTextColor,
+                    petAccentColor = petAccentColor
                 )
                 TaskTabChip(
                     text = "Completadas",
@@ -255,7 +263,8 @@ fun TasksScreen(
                     modifier = Modifier.weight(1f),
                     onClick = { selectedTab = "completed" },
                     petThemeColor = petThemeColor,
-                    petTextColor = petTextColor
+                    petTextColor = petTextColor,
+                    petAccentColor = petAccentColor
                 )
             }
         }
@@ -338,6 +347,10 @@ fun TasksScreen(
                             val updatedTasks = tasks.filter { it.id != deletedTask.id }
                             onTasksChanged(updatedTasks)
                             scope.launch { FirebaseManager.deleteTask(deletedTask.id) }
+                        },
+                        onEdit = { task ->
+                            taskToEdit = task
+                            showDialog = true
                         }
                     )
                 }
@@ -347,7 +360,10 @@ fun TasksScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         Button(
-            onClick = { showDialog = true },
+            onClick = { 
+                taskToEdit = null
+                showDialog = true 
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp), // Reduced height from 64
@@ -374,7 +390,6 @@ fun TasksScreen(
     }
 
     if (showDialog) {
-        var selectedPriority by remember { mutableStateOf("Media") }
         val calendar = Calendar.getInstance()
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = calendar.timeInMillis
@@ -397,10 +412,13 @@ fun TasksScreen(
         } ?: ""
 
         val selectedTimeText = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
-        val combinedDateTimeText = if (selectedDateText.isNotBlank()) "$selectedDateText $selectedTimeText" else "Sin fecha"
+        val combinedDateTimeText = if (selectedDateText.isNotBlank()) "$selectedDateText $selectedTimeText" else (taskToEdit?.dueDate ?: "Sin fecha")
 
         AlertDialog(
-            onDismissRequest = { showDialog = false },
+            onDismissRequest = { 
+                showDialog = false 
+                taskToEdit = null
+            },
             shape = RoundedCornerShape(28.dp),
             containerColor = if (isDark) MaterialTheme.colorScheme.surface else Color(0xFFFFFBEE),
             title = {
@@ -408,12 +426,24 @@ fun TasksScreen(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Nueva tarea",
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) MaterialTheme.colorScheme.onSurface else petTextColor,
-                        fontSize = 24.sp
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (equippedPet == "Pompompurin") {
+                            Image(
+                                painter = painterResource(id = R.drawable.pompompurin), // Assuming this is the new image ID or similar
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(100.dp)
+                                    .padding(bottom = 8.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                        Text(
+                            text = if (taskToEdit != null) "Editar tarea" else "Nueva tarea",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) MaterialTheme.colorScheme.onSurface else petTextColor,
+                            fontSize = 24.sp
+                        )
+                    }
                 }
             },
             text = {
@@ -502,35 +532,63 @@ fun TasksScreen(
                 Button(
                     onClick = {
                         if (newTaskTitle.isNotBlank()) {
-                            val newTask = Task(
-                                id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
-                                name = newTaskTitle.trim(),
-                                subject = newTaskSubject.trim().ifBlank { "General" },
-                                priority = selectedPriority,
-                                emoji = newTaskEmoji.trim().ifBlank { defaultTaskEmoji(selectedPriority) },
-                                dueDate = combinedDateTimeText
-                            )
-                            val updatedTasks = tasks + newTask
+                            val updatedTask = if (taskToEdit != null) {
+                                taskToEdit!!.copy(
+                                    name = newTaskTitle.trim(),
+                                    subject = newTaskSubject.trim(),
+                                    priority = selectedPriority,
+                                    emoji = newTaskEmoji.trim().ifBlank { taskToEdit!!.emoji },
+                                    dueDate = combinedDateTimeText
+                                )
+                            } else {
+                                Task(
+                                    id = (tasks.maxOfOrNull { it.id } ?: 0) + 1,
+                                    name = newTaskTitle.trim(),
+                                    subject = newTaskSubject.trim().ifBlank { "General" },
+                                    priority = selectedPriority,
+                                    emoji = newTaskEmoji.trim().ifBlank { defaultTaskEmoji(selectedPriority) },
+                                    dueDate = combinedDateTimeText
+                                )
+                            }
+                            
+                            val updatedTasks = if (taskToEdit != null) {
+                                tasks.map { if (it.id == updatedTask.id) updatedTask else it }
+                            } else {
+                                tasks + updatedTask
+                            }
+                            
                             onTasksChanged(updatedTasks)
                             scope.launch { 
-                                FirebaseManager.saveTask(newTask)
-                                FirebaseManager.incrementDailyStat("createdTasks")
+                                FirebaseManager.saveTask(updatedTask)
+                                if (taskToEdit == null) {
+                                    FirebaseManager.incrementDailyStat("createdTasks")
+                                }
                             }
                             newTaskTitle = ""
                             newTaskSubject = ""
                             newTaskEmoji = ""
                             showDialog = false
+                            taskToEdit = null
                         }
                     },
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isDark) MaterialTheme.colorScheme.primary else petButtonColor)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (equippedPet == "Pompompurin") Color(0xFFFFC400) else if (isDark) MaterialTheme.colorScheme.primary else petButtonColor
+                    )
                 ) {
-                    Text("Agregar", color = if (isDark) White else petTextColor, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (taskToEdit != null) "Guardar" else "Agregar", 
+                        color = if (equippedPet == "Pompompurin") Color(0xFF5A1C05) else if (isDark) White else petTextColor, 
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Cancelar", color = TextSecondary)
+                TextButton(onClick = { 
+                    showDialog = false 
+                    taskToEdit = null
+                }) {
+                    Text("Cancelar", color = if (equippedPet == "Pompompurin") Color(0xFFE8A900) else TextSecondary)
                 }
             }
         )
@@ -594,7 +652,8 @@ private fun TaskTabChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     petThemeColor: Color,
-    petTextColor: Color
+    petTextColor: Color,
+    petAccentColor: Color
 ) {
     val isDark = isSystemInDarkTheme()
     Surface(
@@ -617,7 +676,7 @@ private fun TaskTabChip(
             Spacer(modifier = Modifier.width(4.dp))
             Surface(
                 shape = RoundedCornerShape(50.dp),
-                color = if (text == "Pendientes") PinkPrimary else TealPrimary
+                color = if (selected) petAccentColor else Color.Gray.copy(alpha = 0.3f)
             ) {
                 Text(
                     text = count.toString(),
@@ -632,7 +691,7 @@ private fun TaskTabChip(
 }
 
 @Composable
-fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
+fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit, onEdit: (Task) -> Unit) {
     val isDark = isSystemInDarkTheme()
     val priorityColor = when (task.priority) {
         "Alta" -> PinkPrimary
@@ -723,6 +782,17 @@ fun TaskItem(task: Task, onToggle: (Task) -> Unit, onDelete: (Task) -> Unit) {
                         fontSize = 20.sp // Reduced from 28
                     )
                 }
+            }
+            IconButton(
+                onClick = { onEdit(task) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Editar",
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    modifier = Modifier.size(18.dp)
+                )
             }
             IconButton(
                 onClick = { onDelete(task) },

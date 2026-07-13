@@ -411,16 +411,21 @@ fun StudySessionScreen(
                 )
             }
 
-            val petRes = R.drawable.cinnamoroll_echado
+            val petRes = when (equippedPetName) {
+                "Pompompurin" -> R.drawable.pompompurin
+                "Hello Kitty" -> R.drawable.hello_kitty
+                else -> R.drawable.cinnamoroll_echado
+            }
+            
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = 90.dp)
+                    .offset(y = if (equippedPetName == "Pompompurin") 65.dp else 90.dp)
             ) {
                 Image(
                     painter = painterResource(id = petRes),
-                    contentDescription = "Cinnamoroll",
-                    modifier = Modifier.size(240.dp),
+                    contentDescription = equippedPetName,
+                    modifier = Modifier.size(if (equippedPetName == "Pompompurin") 200.dp else 240.dp),
                     contentScale = ContentScale.Fit
                 )
             }

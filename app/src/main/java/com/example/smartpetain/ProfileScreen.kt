@@ -3,6 +3,7 @@ package com.example.smartpetain
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -138,55 +142,74 @@ fun ProfileScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Box(contentAlignment = Alignment.BottomEnd) {
-            val avatarModifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .border(2.dp, themeColor, CircleShape)
-                .clickable(enabled = !isUploadingAvatar) { imagePicker.launch("image/*") }
+        Box(contentAlignment = Alignment.Center) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                val avatarModifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, themeColor, CircleShape)
+                    .clickable(enabled = !isUploadingAvatar) { imagePicker.launch("image/*") }
 
-            val avatarModel = localAvatarUri ?: profile.avatarUrl
+                val avatarModel = localAvatarUri ?: profile.avatarUrl
 
-            if (avatarModel != null) {
-                AsyncImage(
-                    model = avatarModel,
-                    contentDescription = "Foto de perfil",
-                    modifier = avatarModifier,
-                    contentScale = ContentScale.Crop
-                )
-            } else {
+                if (avatarModel != null) {
+                    AsyncImage(
+                        model = avatarModel,
+                        contentDescription = "Foto de perfil",
+                        modifier = avatarModifier,
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = avatarModifier.background(themeColor.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = themeColor
+                        )
+                    }
+                }
+
                 Box(
-                    modifier = avatarModifier.background(themeColor.copy(alpha = 0.2f)),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(themeColor)
+                        .border(2.dp, White, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = themeColor
-                    )
+                    if (isUploadingAvatar) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Cambiar foto",
+                            modifier = Modifier.size(16.dp),
+                            tint = White
+                        )
+                    }
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(themeColor),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isUploadingAvatar) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Cambiar foto",
-                        modifier = Modifier.size(16.dp),
-                        tint = White
+            if (equippedPetName == "Cinnamoroll") {
+                val context = LocalContext.current
+                val marcoResId = context.resources.getIdentifier("cinnamoroll_marco", "drawable", context.packageName)
+                
+                if (marcoResId != 0) {
+                    Image(
+                        painter = painterResource(id = marcoResId),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(150.dp)
+                            .offset(y = (-12).dp), // Ajustado para que el Cinnamoroll del marco quede arriba
+                        contentScale = ContentScale.Fit
                     )
                 }
             }
