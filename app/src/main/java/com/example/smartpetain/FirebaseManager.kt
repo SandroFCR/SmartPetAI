@@ -45,7 +45,13 @@ data class PetStats(
     val level: Int = 1,
     val xp: Int = 0
 ) {
-    val maxXp: Int get() = level * 100
+    val maxXp: Int get() = when(level) {
+        1 -> 100
+        2 -> 200
+        3 -> 400
+        4 -> 800
+        else -> 1600
+    }
 }
 
 object FirebaseManager {
@@ -552,11 +558,22 @@ object FirebaseManager {
 
                 var newXp = currentXp + amount
                 var newLevel = currentLevel
-                val maxXp = newLevel * 100
-
-                if (newXp >= maxXp && newLevel < 5) {
-                    newXp -= maxXp
-                    newLevel++
+                
+                // Progress through levels if XP exceeds current level's maxXp
+                while (true) {
+                    val maxXp = when(newLevel) {
+                        1 -> 100
+                        2 -> 200
+                        3 -> 400
+                        4 -> 800
+                        else -> 1600
+                    }
+                    if (newXp >= maxXp && newLevel < 5) {
+                        newXp -= maxXp
+                        newLevel++
+                    } else {
+                        break
+                    }
                 }
 
                 transaction.update(petRef, "xp", newXp, "level", newLevel)

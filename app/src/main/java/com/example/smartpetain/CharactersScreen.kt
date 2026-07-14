@@ -1,5 +1,6 @@
 package com.example.smartpetain
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +75,7 @@ data class CharacterTip(
 data class CharacterInfo(
     val name: String,
     val imageSource: ImageSource,
+    val nextLevelImage: ImageSource? = null,
     val role: String,
     val description: String,
     val trigger: String,
@@ -510,12 +513,58 @@ private fun CharacterDetailScreen(
             
             Spacer(modifier = Modifier.height(18.dp))
 
-            CharacterImage(
-                source = character.imageSource,
-                name = character.name,
-                backgroundColorName = character.color,
-                size = 170
-            )
+            // Evolution Preview (Horizontal Scroll)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Current Level
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CharacterImage(
+                        source = character.imageSource,
+                        name = character.name,
+                        backgroundColorName = character.color,
+                        size = 170
+                    )
+                    Text(
+                        "Nivel ${character.level} (Actual)",
+                        fontSize = 12.sp,
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                if (character.nextLevelImage != null) {
+                    Spacer(modifier = Modifier.width(30.dp))
+                    
+                    // Next Level Preview
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.alpha(0.5f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            CharacterImage(
+                                source = character.nextLevelImage,
+                                name = "Siguiente nivel",
+                                backgroundColorName = "gray",
+                                size = 150
+                            )
+                            Text("🔒", fontSize = 30.sp)
+                        }
+                        Text(
+                            "Nivel ${character.level + 1}",
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -747,6 +796,7 @@ private fun characterLightColor(colorName: String) = when (colorName) {
     "amber" -> AmberLight
     "pink" -> PinkLight
     "teal" -> TealLight
+    "gray" -> Color.LightGray.copy(alpha = 0.3f)
     else -> PurpleLight
 }
 
@@ -765,11 +815,14 @@ private fun buildCharactersFromStats(
     return listOf("Cinnamoroll", "Pompompurin", "Hello Kitty").map { petName ->
         val stats = petStatsList.find { it.name == petName } ?: PetStats(petName)
         val level = stats.level
+        val currentImg = CharacterEngine.getPetImage(petName, level)
+        val nextImg = if (level < 3) CharacterEngine.getPetImage(petName, level + 1) else null
         
         when (petName) {
             "Cinnamoroll" -> CharacterInfo(
                 name = "Cinnamoroll",
-                imageSource = ImageSource.Local(R.drawable.cinnamoroll),
+                imageSource = ImageSource.Local(currentImg),
+                nextLevelImage = nextImg?.let { ImageSource.Local(it) },
                 role = "Motivacion y enfoque",
                 description = "Sube cuando estudias y completas sesiones Pomodoro.",
                 trigger = "Aparece al estudiar 25+ min seguidos",
@@ -786,7 +839,8 @@ private fun buildCharactersFromStats(
             )
             "Pompompurin" -> CharacterInfo(
                 name = "Pompompurin",
-                imageSource = ImageSource.Local(R.drawable.pompompurin),
+                imageSource = ImageSource.Local(currentImg),
+                nextLevelImage = nextImg?.let { ImageSource.Local(it) },
                 role = "Descanso y equilibrio",
                 description = "Sube cuando mantienes buenos habitos y descansas.",
                 trigger = "Aparece tras 50+ min sin descanso",
@@ -803,7 +857,8 @@ private fun buildCharactersFromStats(
             )
             else -> CharacterInfo(
                 name = "Hello Kitty",
-                imageSource = ImageSource.Local(R.drawable.hello_kitty),
+                imageSource = ImageSource.Local(currentImg),
+                nextLevelImage = nextImg?.let { ImageSource.Local(it) },
                 role = "Organizacion",
                 description = "Sube cuando organizas tus pendientes.",
                 trigger = "Aparece con 3+ tareas pendientes",

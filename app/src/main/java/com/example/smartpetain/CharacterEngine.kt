@@ -13,11 +13,32 @@ data class Character(
     val emoji: String,
     val role: String,
     val message: String,
-    val color: String // "purple", "amber", "pink"
+    val color: String, // "purple", "amber", "pink"
+    val imageRes: Int = R.drawable.cinnamoroll
 )
 
 // Motor de decisión de personajes
 object CharacterEngine {
+
+    fun getPetImage(name: String, level: Int): Int {
+        return when (name) {
+            "Pompompurin" -> when (level) {
+                2 -> R.drawable.pompurin_lv2
+                3 -> R.drawable.pompurin_lv3
+                else -> R.drawable.pompompurin
+            }
+            "Hello Kitty" -> when (level) {
+                2 -> R.drawable.hello_kitty_lv2
+                3 -> R.drawable.hello_kitty_lv3
+                else -> R.drawable.hello_kitty
+            }
+            else -> when (level) { // Cinnamoroll
+                2 -> R.drawable.cinnamoroll_lv2
+                3 -> R.drawable.cinnamoroll_lv3
+                else -> R.drawable.cinnamoroll
+            }
+        }
+    }
 
     fun getCharacter(
         equippedPetName: String,
@@ -36,10 +57,11 @@ object CharacterEngine {
         if (state == UserState.DISORGANIZED) return helloKittyAlert(pendingTasks)
 
         // Prioridad 3: Mascota equipada en estado normal (FOCUSED)
+        val petImg = getPetImage(equippedPetName, petLevel)
         return when (equippedPetName) {
-            "Pompompurin" -> pompompurinFocused(studyMinutes, petLevel)
-            "Hello Kitty" -> helloKittyFocused(studyMinutes, petLevel)
-            else -> cinnamorollFocused(studyMinutes, petLevel)
+            "Pompompurin" -> pompompurinFocused(studyMinutes, petLevel, petImg)
+            "Hello Kitty" -> helloKittyFocused(studyMinutes, petLevel, petImg)
+            else -> cinnamorollFocused(studyMinutes, petLevel, petImg)
         }
     }
 
@@ -58,7 +80,7 @@ object CharacterEngine {
         return UserState.FOCUSED
     }
 
-    private fun cinnamorollFocused(studyMinutes: Int, level: Int): Character {
+    private fun cinnamorollFocused(studyMinutes: Int, level: Int, img: Int): Character {
         val message = when {
             studyMinutes >= 60 -> "¡Increíble nivel $level! Llevas más de una hora enfocada. 🌟"
             studyMinutes >= 25 -> "¡Buen trabajo! Completaste un Pomodoro. ¡Sigue así! 💙"
@@ -69,11 +91,12 @@ object CharacterEngine {
             emoji = "🐶",
             role = "Motivación y enfoque",
             message = message,
-            color = "purple"
+            color = "purple",
+            imageRes = img
         )
     }
 
-    private fun pompompurinFocused(studyMinutes: Int, level: Int): Character {
+    private fun pompompurinFocused(studyMinutes: Int, level: Int, img: Int): Character {
         val message = when {
             studyMinutes >= 45 -> "¡Nivel $level alcanzado! Estás haciendo un gran esfuerzo. 🍮"
             else -> "Me encanta verte estudiar con calma. (Nivel $level) ✨"
@@ -83,11 +106,12 @@ object CharacterEngine {
             emoji = "🐶",
             role = "Descanso y equilibrio",
             message = message,
-            color = "amber"
+            color = "amber",
+            imageRes = img
         )
     }
 
-    private fun helloKittyFocused(studyMinutes: Int, level: Int): Character {
+    private fun helloKittyFocused(studyMinutes: Int, level: Int, img: Int): Character {
         val message = when {
             studyMinutes >= 30 -> "¡Nivel $level! Todo está bajo control y bien organizado. 🎀"
             else -> "¡Qué ordenado está todo! Sigamos así. (Nivel $level) 💕"
@@ -97,7 +121,8 @@ object CharacterEngine {
             emoji = "🎀",
             role = "Organización",
             message = message,
-            color = "pink"
+            color = "pink",
+            imageRes = img
         )
     }
 

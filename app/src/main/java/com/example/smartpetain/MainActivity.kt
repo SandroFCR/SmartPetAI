@@ -459,7 +459,7 @@ fun DashboardScreen(
         ) {
             GreetingHeader(userName = userName, compact = compact, accentColor = petAccentColor)
             Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
-            MascotHero(compact = compact, equippedPet = equippedPet)
+            MascotHero(compact = compact, petImage = activeCharacter.imageRes, equippedPet = equippedPet)
             Spacer(modifier = Modifier.height(if (compact) 4.dp else 6.dp))
             MotivationCard(message = activeCharacter.message, compact = compact, accentColor = petAccentColor)
             Spacer(modifier = Modifier.height(if (compact) 6.dp else 10.dp))
@@ -542,16 +542,10 @@ private fun GreetingHeader(userName: String, compact: Boolean, accentColor: Colo
 }
 
 @Composable
-private fun MascotHero(compact: Boolean, equippedPet: String) {
+private fun MascotHero(compact: Boolean, petImage: Int, equippedPet: String) {
     val heroHeight = if (compact) 180.dp else 210.dp
     val circleSize = if (compact) 150.dp else 176.dp
     val imageHeight = if (compact) 170.dp else 198.dp
-
-    val petImage = when (equippedPet) {
-        "Pompompurin" -> R.drawable.pompompurin
-        "Hello Kitty" -> R.drawable.hello_kitty
-        else -> R.drawable.cinnamoroll
-    }
 
     Box(
         modifier = Modifier
