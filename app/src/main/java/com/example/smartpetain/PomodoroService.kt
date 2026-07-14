@@ -56,7 +56,7 @@ class PomodoroService : Service() {
                 blockedPackages = emptySet()
                 pauseTimer()
                 stopForeground(STOP_FOREGROUND_REMOVE)
-gitt                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+              val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 nm.cancel(2001) // Explicitly cancel the timer notification
                 stopSelf()
             }
